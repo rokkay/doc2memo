@@ -1,0 +1,115 @@
+<?php
+
+use App\Livewire\TechnicalMemories\ShowMemory;
+use App\Models\TechnicalMemory;
+use App\Models\Tender;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
+
+uses()->group('livewire');
+uses(RefreshDatabase::class);
+
+beforeEach(function (): void {
+    $this->seed(\Database\Seeders\DatabaseSeeder::class);
+});
+
+it('renders successfully with memory', function (): void {
+    $tender = Tender::factory()->create();
+    TechnicalMemory::factory()->create([
+        'tender_id' => $tender->id,
+    ]);
+
+    Livewire::test(ShowMemory::class, ['tender' => $tender])
+        ->assertOk();
+});
+
+it('displays all sections when present', function (): void {
+    $tender = Tender::factory()->create();
+    TechnicalMemory::factory()->create([
+        'tender_id' => $tender->id,
+        'introduction' => 'Texto de introduccion',
+        'company_presentation' => 'Texto de presentacion',
+        'technical_approach' => 'Texto de enfoque tecnico',
+        'methodology' => 'Texto de metodologia',
+        'team_structure' => 'Texto de estructura de equipo',
+        'timeline' => 'Texto de cronograma',
+        'quality_assurance' => 'Texto de calidad',
+        'risk_management' => 'Texto de riesgos',
+        'compliance_matrix' => 'Texto de cumplimiento',
+    ]);
+
+    Livewire::test(ShowMemory::class, ['tender' => $tender])
+        ->assertSee('1. Introduccion')
+        ->assertSee('2. Presentacion de la Empresa')
+        ->assertSee('3. Enfoque Tecnico')
+        ->assertSee('4. Metodologia')
+        ->assertSee('5. Estructura del Equipo')
+        ->assertSee('6. Cronograma')
+        ->assertSee('7. Aseguramiento de Calidad')
+        ->assertSee('8. Gestion de Riesgos')
+        ->assertSee('9. Matriz de Cumplimiento')
+        ->assertSee('Texto de introduccion')
+        ->assertSee('Texto de presentacion')
+        ->assertSee('Texto de enfoque tecnico')
+        ->assertSee('Texto de metodologia')
+        ->assertSee('Texto de estructura de equipo')
+        ->assertSee('Texto de cronograma')
+        ->assertSee('Texto de calidad')
+        ->assertSee('Texto de riesgos')
+        ->assertSee('Texto de cumplimiento');
+});
+
+it('displays generation date', function (): void {
+    $tender = Tender::factory()->create();
+    TechnicalMemory::factory()->create([
+        'tender_id' => $tender->id,
+        'generated_at' => '2026-01-15 14:30:00',
+    ]);
+
+    Livewire::test(ShowMemory::class, ['tender' => $tender])
+        ->assertSee('Generada el 15/01/2026 14:30');
+});
+
+it('has back link', function (): void {
+    $tender = Tender::factory()->create();
+    TechnicalMemory::factory()->create([
+        'tender_id' => $tender->id,
+    ]);
+
+    Livewire::test(ShowMemory::class, ['tender' => $tender])
+        ->assertSee('Volver')
+        ->assertSee(route('tenders.show', $tender));
+});
+
+it('shows download button when file path exists', function (): void {
+    $tender = Tender::factory()->create();
+    $memory = TechnicalMemory::factory()->create([
+        'tender_id' => $tender->id,
+        'generated_file_path' => 'technical-memories/memoria.pdf',
+    ]);
+
+    Livewire::test(ShowMemory::class, ['tender' => $tender])
+        ->assertSee('Descargar PDF')
+        ->assertSee(route('technical-memories.download', $memory));
+});
+
+it('hides download button when no file path', function (): void {
+    $tender = Tender::factory()->create();
+    TechnicalMemory::factory()->create([
+        'tender_id' => $tender->id,
+        'generated_file_path' => null,
+    ]);
+
+    Livewire::test(ShowMemory::class, ['tender' => $tender])
+        ->assertDontSee('Descargar PDF');
+});
+
+it('shows empty state when no memory exists', function (): void {
+    $tender = Tender::factory()->create();
+
+    Livewire::test(ShowMemory::class, ['tender' => $tender])
+        ->assertSee('No hay memoria tecnica generada')
+        ->assertSee('La memoria tecnica aun no ha sido generada para esta licitacion.')
+        ->assertSee('Volver a la licitacion')
+        ->assertSee(route('tenders.show', $tender));
+});
