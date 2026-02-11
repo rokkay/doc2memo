@@ -1,59 +1,97 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Doc2Memo
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Doc2Memo helps teams prepare a competitive technical report ("Memoria tecnica") for public tenders.
 
-## About Laravel
+The app workflow is:
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+1. Create a tender and upload two source documents:
+   - `PCA` (administrative conditions)
+   - `PPT` (technical specifications)
+2. Documents are processed by queue jobs and analyzed with Laravel AI agents.
+3. Extracted criteria, specifications, and insights are stored in the database.
+4. The user triggers memory generation, which runs async and produces the final technical memory.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+Sample tender documents are available at `docs/samples/*`.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Tech Stack
 
-## Learning Laravel
+- PHP 8.4
+- Laravel 12
+- Livewire 4
+- Pest 4
+- Laravel AI SDK (`laravel/ai`)
+- Tailwind CSS 4
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+## Local Setup
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+1. Install dependencies:
 
-## Laravel Sponsors
+```bash
+composer install
+npm install
+```
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+2. Configure environment:
 
-### Premium Partners
+```bash
+cp .env.example .env
+php artisan key:generate
+```
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+3. Run database migrations:
 
-## Contributing
+```bash
+php artisan migrate
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+4. Start app services:
 
-## Code of Conduct
+```bash
+php artisan serve
+php artisan queue:work
+npm run dev
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Queue workers are required for both document analysis and memory generation.
 
-## Security Vulnerabilities
+## Important Runtime Notes
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+- The `deadline_date` field is stored as plain text (not a date type), because tenders often describe deadlines in natural language.
+- Document and memory actions are asynchronous; UI feedback appears immediately while jobs continue in background.
+- If code changes are not reflected in processing behavior, restart workers:
 
-## License
+```bash
+php artisan queue:restart
+php artisan optimize:clear
+```
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## Main Domain Flow
+
+- `app/Livewire/Tenders/CreateTender.php`: tender creation + document upload
+- `app/Jobs/ProcessDocument.php`: per-document analysis job
+- `app/Actions/Documents/ProcessDocumentAction.php`: extraction + persistence
+- `app/Jobs/GenerateTechnicalMemory.php`: async memory generation job
+- `app/Actions/Tenders/GenerateTechnicalMemoryAction.php`: memory building + save
+- `app/Ai/Agents/DocumentAnalyzer.php`: PCA/PPT structured extraction
+- `app/Ai/Agents/TechnicalMemoryGenerator.php`: final technical memory generation
+
+## Testing
+
+Run all tests:
+
+```bash
+php artisan test --compact
+```
+
+Format changed files:
+
+```bash
+php vendor/bin/pint --dirty --format agent
+```
+
+## Troubleshooting
+
+- **Jobs not moving / UI stuck in processing**: verify `queue:work` is running.
+- **Old behavior after code changes**: run `php artisan queue:restart`.
+- **AI calls timing out in browser action**: make sure action is queued (current design is async).
+- **Vite assets not updating**: run `npm run dev`.
