@@ -69,7 +69,7 @@
                         };
                     @endphp
 
-                    <article class="rounded-xl border border-slate-200 p-3 dark:border-slate-700" wire:key="criterion-{{ $criterion->id }}">
+                    <article class="rounded-xl border border-slate-200 p-3 transition duration-200 hover:-translate-y-0.5 hover:shadow-sm dark:border-slate-700" wire:key="criterion-{{ $criterion->id }}">
                         <div class="flex items-start justify-between gap-3">
                             <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">
                                 @if($criterion->section_number)
@@ -95,7 +95,7 @@
 
             <div class="max-h-[24rem] space-y-2 overflow-y-auto px-4 py-4 sm:px-6">
                 @foreach($document->extractedSpecifications as $spec)
-                    <article class="rounded-xl border border-slate-200 p-3 dark:border-slate-700" wire:key="spec-{{ $spec->id }}">
+                    <article class="rounded-xl border border-slate-200 p-3 transition duration-200 hover:-translate-y-0.5 hover:shadow-sm dark:border-slate-700" wire:key="spec-{{ $spec->id }}">
                         <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">
                             @if($spec->section_number)
                                 {{ $spec->section_number }} -
