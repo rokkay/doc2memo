@@ -55,7 +55,6 @@ class GenerateTechnicalMemorySection implements ShouldQueue
         }
 
         $memory->update([
-            'full_report_markdown' => TechnicalMemorySections::buildFullReportMarkdown($memory),
             'status' => 'generated',
             'generated_at' => now(),
         ]);

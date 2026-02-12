@@ -62,6 +62,37 @@ it('displays all sections when present', function (): void {
         ->assertSee('Texto de cumplimiento');
 });
 
+it('renders section content as markdown html', function (): void {
+    $tender = Tender::factory()->create();
+
+    TechnicalMemory::factory()->create([
+        'tender_id' => $tender->id,
+        'introduction' => "Este bloque usa **negrita** y una lista:\n\n- Punto A\n- Punto B",
+    ]);
+
+    Livewire::test(ShowMemory::class, ['tender' => $tender])
+        ->assertSee('Este bloque usa')
+        ->assertDontSee('**negrita**')
+        ->assertSeeHtml('<strong>negrita</strong>')
+        ->assertSeeHtml('<li>Punto A</li>')
+        ->assertSeeHtml('<li>Punto B</li>');
+});
+
+it('renders markdown tables in section content', function (): void {
+    $tender = Tender::factory()->create();
+
+    TechnicalMemory::factory()->create([
+        'tender_id' => $tender->id,
+        'quality_assurance' => "### Tabla QA\n\n| Hito | Evidencia |\n| --- | --- |\n| H1 | Checklist |",
+    ]);
+
+    Livewire::test(ShowMemory::class, ['tender' => $tender])
+        ->assertSee('Tabla QA')
+        ->assertSeeHtml('<table>')
+        ->assertSeeHtml('<th>Hito</th>')
+        ->assertSeeHtml('<td>Checklist</td>');
+});
+
 it('displays generation date', function (): void {
     $tender = Tender::factory()->create();
     TechnicalMemory::factory()->create([

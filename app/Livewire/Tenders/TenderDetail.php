@@ -143,7 +143,6 @@ class TenderDetail extends Component
                     'quality_assurance' => null,
                     'risk_management' => null,
                     'compliance_matrix' => null,
-                    'full_report_markdown' => null,
                     'status' => 'draft',
                     'generated_file_path' => null,
                     'generated_at' => null,

@@ -90,13 +90,13 @@ INSTRUCTIONS;
 
         if ($this->requiresTimelinePlan()) {
             return [
-                'content' => (string) $this->value($response, 'timeline', ''),
+                'content' => $this->sanitizeMarkdown((string) $this->value($response, 'timeline', '')),
                 'timeline_plan' => $this->normalizeTimelinePlan($this->value($response, 'timeline_plan', [])),
             ];
         }
 
         return [
-            'content' => (string) $this->value($response, $this->sectionField(), ''),
+            'content' => $this->sanitizeMarkdown((string) $this->value($response, $this->sectionField(), '')),
             'timeline_plan' => null,
         ];
     }
@@ -133,6 +133,10 @@ Generate only this section of a technical memory (Memoria Tecnica): {$this->sect
 - Prefer 4-7 substantial paragraphs with smooth transitions.
 - When criteria points are available, reference them explicitly and explain compliance strategy.
 - Include measurable commitments, verification mechanisms, and expected impact.
+- Return the section content as valid Markdown (not HTML).
+- Do not include a top-level report title or a repeated section title using # or ##.
+- Use Markdown structure to improve readability: short subsections (###), bullet lists, and tables when useful.
+- Keep prose concise and scannable while preserving technical depth.
 
 {$outputRequirement}
 PROMPT;
@@ -182,8 +186,8 @@ PROMPT;
 
                 return [
                     'id' => (string) ($task['id'] ?? ''),
-                    'title' => (string) ($task['title'] ?? ''),
-                    'lane' => (string) ($task['lane'] ?? 'General'),
+                    'title' => $this->sanitizeMarkdown((string) ($task['title'] ?? '')),
+                    'lane' => $this->sanitizeMarkdown((string) ($task['lane'] ?? 'General')),
                     'start_week' => $startWeek,
                     'end_week' => $endWeek,
                     'depends_on' => collect($task['depends_on'] ?? [])
@@ -200,7 +204,7 @@ PROMPT;
         $milestones = collect($value['milestones'] ?? [])
             ->filter(fn (mixed $milestone): bool => is_array($milestone))
             ->map(fn (array $milestone): array => [
-                'title' => (string) ($milestone['title'] ?? ''),
+                'title' => $this->sanitizeMarkdown((string) ($milestone['title'] ?? '')),
                 'week' => max(1, (int) ($milestone['week'] ?? 1)),
             ])
             ->filter(fn (array $milestone): bool => $milestone['title'] !== '')
@@ -215,5 +219,14 @@ PROMPT;
             'tasks' => $tasks,
             'milestones' => $milestones,
         ];
+    }
+
+    protected function sanitizeMarkdown(string $content): string
+    {
+        $content = str_replace("\x13", 'ó', $content);
+
+        $sanitized = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $content);
+
+        return trim($sanitized ?? $content);
     }
 }

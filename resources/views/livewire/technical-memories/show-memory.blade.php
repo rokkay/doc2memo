@@ -164,18 +164,10 @@
 
         </section>
 
-        <section class="grid grid-cols-1 gap-6 xl:grid-cols-12" x-data="{ expandAllDetails() { this.$root.querySelectorAll('[data-section-detail]').forEach((el) => { el.open = true }) }, collapseAllDetails() { this.$root.querySelectorAll('[data-section-detail]').forEach((el) => { el.open = false }) } }">
+        <section class="grid grid-cols-1 gap-6 xl:grid-cols-12">
             <aside class="xl:col-span-3">
                 <div class="sticky top-24 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                     <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Indice</h2>
-                    <div class="mt-3 grid grid-cols-2 gap-2">
-                        <button type="button" @click="expandAllDetails" class="inline-flex cursor-pointer items-center justify-center rounded-lg bg-slate-100 px-2 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
-                            Expandir detalles
-                        </button>
-                        <button type="button" @click="collapseAllDetails" class="inline-flex cursor-pointer items-center justify-center rounded-lg bg-slate-100 px-2 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
-                            Contraer detalles
-                        </button>
-                    </div>
                     <ul class="mt-3 space-y-2">
                         @foreach($sections as $section)
                             <li>
@@ -375,43 +367,11 @@
                             </div>
                         @endif
 
-                        @php
-                            $content = trim((string) $section['content']);
-                            $contentLength = mb_strlen($content);
-                            $paragraphs = collect(preg_split('/\n\s*\n/u', $content) ?: [])->map(fn (string $paragraph): string => trim($paragraph))->filter(fn (string $paragraph): bool => $paragraph !== '')->values();
-                            $alwaysVisibleParagraphs = $paragraphs->take(2);
-                            $collapsibleParagraphs = $paragraphs->slice(2);
-                            $shouldCollapse = $contentLength > 2600 && $collapsibleParagraphs->isNotEmpty();
-                        @endphp
+                        @php($content = trim((string) $section['content']))
 
-                        <div class="mt-3 text-sm leading-7 text-slate-700 dark:text-slate-200">
-                            @foreach($alwaysVisibleParagraphs as $paragraph)
-                                <p class="mb-4">{!! nl2br(e($paragraph)) !!}</p>
-                            @endforeach
-
-                            @if(! $shouldCollapse)
-                                @foreach($collapsibleParagraphs as $paragraph)
-                                    <p class="mb-4">{!! nl2br(e($paragraph)) !!}</p>
-                                @endforeach
-                            @endif
-                        </div>
-
-                        @if($shouldCollapse)
-                            <details data-section-detail class="group mt-1 rounded-xl border border-slate-200 bg-slate-50/80 dark:border-slate-700 dark:bg-slate-800/40">
-                                <summary class="cursor-pointer list-none px-4 py-3 text-sm font-medium text-slate-700 marker:content-none dark:text-slate-200">
-                                    <span class="inline-flex items-center gap-2">
-                                        Expandir detalle tecnico de esta seccion
-                                        <span class="text-xs text-slate-500 dark:text-slate-400">({{ $collapsibleParagraphs->count() }} bloques adicionales)</span>
-                                    </span>
-                                </summary>
-
-                                <div class="border-t border-slate-200 px-4 py-4 text-sm leading-7 text-slate-700 dark:border-slate-700 dark:text-slate-200">
-                                    @foreach($collapsibleParagraphs as $paragraph)
-                                        <p class="mb-4">{!! nl2br(e($paragraph)) !!}</p>
-                                    @endforeach
-                                </div>
-                            </details>
-                        @endif
+                        <x-markdown class="mt-3 space-y-4 text-sm leading-7 text-slate-700 dark:text-slate-200 [&_a]:text-cyan-700 [&_a]:underline [&_a]:decoration-cyan-400/60 dark:[&_a]:text-cyan-300 dark:[&_blockquote]:border-slate-600/70 dark:[&_blockquote]:text-slate-300 dark:[&_code]:bg-slate-800 dark:[&_code]:text-slate-100 dark:[&_hr]:border-slate-700 dark:[&_ol]:text-slate-200 dark:[&_p]:text-slate-200 dark:[&_pre]:bg-slate-900/90 dark:[&_pre]:text-slate-100 dark:[&_strong]:text-slate-100 dark:[&_table]:border-slate-700 dark:[&_tbody_tr:nth-child(even)]:bg-slate-800/40 dark:[&_td]:border-slate-700 dark:[&_td]:text-slate-200 dark:[&_th]:border-slate-700 dark:[&_th]:bg-slate-800 dark:[&_th]:text-slate-100 dark:[&_ul]:text-slate-200 [&_blockquote]:border-l-4 [&_blockquote]:border-slate-300 [&_blockquote]:pl-4 [&_blockquote]:italic [&_code]:rounded [&_code]:bg-slate-100 [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-medium [&_code]:text-slate-800 [&_hr]:my-6 [&_hr]:border-slate-200 [&_li]:my-1 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:my-3 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-slate-950 [&_pre]:p-3 [&_pre]:text-slate-100 [&_strong]:font-semibold [&_strong]:text-slate-900 [&_table]:my-4 [&_table]:w-full [&_table]:border [&_table]:border-slate-300 [&_table]:text-left [&_tbody_tr:nth-child(even)]:bg-slate-50 [&_td]:border [&_td]:border-slate-300 [&_td]:px-3 [&_td]:py-2 [&_th]:border [&_th]:border-slate-300 [&_th]:bg-slate-100 [&_th]:px-3 [&_th]:py-2 [&_th]:font-semibold [&_ul]:list-disc [&_ul]:pl-6">
+                            {{ $content }}
+                        </x-markdown>
                     </article>
                 @endforeach
 

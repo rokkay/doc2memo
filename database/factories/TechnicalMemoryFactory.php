@@ -54,7 +54,6 @@ class TechnicalMemoryFactory extends Factory
             'quality_assurance' => fake()->optional()->paragraph(),
             'risk_management' => fake()->optional()->paragraph(),
             'compliance_matrix' => fake()->optional()->paragraph(),
-            'full_report_markdown' => fake()->optional()->paragraphs(3, true),
             'status' => fake()->randomElement(['draft', 'generated', 'reviewed', 'final']),
             'generated_file_path' => fake()->optional()->filePath(),
             'generated_at' => fake()->optional()->dateTime(),

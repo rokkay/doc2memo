@@ -117,7 +117,6 @@ it('can regenerate existing technical memory and reset sections', function (): v
         'status' => 'generated',
         'generated_at' => now(),
         'introduction' => 'Contenido previo',
-        'full_report_markdown' => 'Reporte previo',
         'generated_file_path' => 'technical-memories/old.pdf',
     ]);
 
@@ -135,7 +134,6 @@ it('can regenerate existing technical memory and reset sections', function (): v
     expect($memory?->status)->toBe('draft');
     expect($memory?->generated_at)->toBeNull();
     expect($memory?->introduction)->toBeNull();
-    expect($memory?->full_report_markdown)->toBeNull();
     expect($memory?->generated_file_path)->toBeNull();
 });
 

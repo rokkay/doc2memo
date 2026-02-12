@@ -80,21 +80,4 @@ class TechnicalMemorySections
             ->filter(fn (string $field): bool => filled($memory->{$field}))
             ->count();
     }
-
-    public static function buildFullReportMarkdown(TechnicalMemory $memory): string
-    {
-        $markdown = '# '.(string) ($memory->title ?: 'Memoria Tecnica')."\n\n";
-
-        foreach (self::fields() as $field) {
-            $content = (string) ($memory->{$field} ?? '');
-
-            if ($content === '') {
-                continue;
-            }
-
-            $markdown .= '## '.self::title($field)."\n\n{$content}\n\n";
-        }
-
-        return trim($markdown);
-    }
 }

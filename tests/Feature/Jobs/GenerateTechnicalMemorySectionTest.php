@@ -21,7 +21,7 @@ it('generates one section and keeps memory in draft when pending sections remain
     ]);
 
     TechnicalMemoryIntroductionAgent::fake([
-        ['introduction' => 'Introduccion redactada por agente dedicado.'],
+        ['introduction' => "### Contexto\n\nEvoluci\x13n redactada por agente dedicado.\n\n- Alcance\n- Riesgos"],
     ])->preventStrayPrompts();
 
     (new GenerateTechnicalMemorySection($memory->id, 'introduction', [], []))->handle();
@@ -29,7 +29,10 @@ it('generates one section and keeps memory in draft when pending sections remain
     $memory = $memory->fresh();
 
     expect($memory)->not->toBeNull();
-    expect($memory?->introduction)->toBe('Introduccion redactada por agente dedicado.');
+    expect($memory?->introduction)->toContain('### Contexto');
+    expect($memory?->introduction)->toContain('Evolución redactada por agente dedicado.');
+    expect($memory?->introduction)->not->toContain("\x13");
+    expect($memory?->introduction)->toContain('- Alcance');
     expect($memory?->status)->toBe('draft');
     expect($memory?->generated_at)->toBeNull();
 });
@@ -54,7 +57,7 @@ it('marks memory as generated when the last section finishes', function (): void
     ]);
 
     TechnicalMemoryComplianceMatrixAgent::fake([
-        ['compliance_matrix' => 'Contenido 9'],
+        ['compliance_matrix' => "### Cobertura de criterios\n\n| Criterio | Estrategia |\n| --- | --- |\n| C1 | Evidencia documental |"],
     ])->preventStrayPrompts();
 
     (new GenerateTechnicalMemorySection($memory->id, 'compliance_matrix', [], []))->handle();
@@ -64,6 +67,7 @@ it('marks memory as generated when the last section finishes', function (): void
     expect($memory)->not->toBeNull();
     expect($memory?->status)->toBe('generated');
     expect($memory?->generated_at)->not->toBeNull();
-    expect($memory?->full_report_markdown)->toContain('## Introduccion');
-    expect($memory?->full_report_markdown)->toContain('## Matriz de Cumplimiento');
+    expect($memory?->introduction)->toBe('Contenido 1');
+    expect($memory?->compliance_matrix)->toContain('### Cobertura de criterios');
+    expect($memory?->compliance_matrix)->toContain('| Criterio | Estrategia |');
 });

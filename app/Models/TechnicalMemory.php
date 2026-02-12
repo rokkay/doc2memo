@@ -23,7 +23,6 @@ class TechnicalMemory extends Model
         'quality_assurance',
         'risk_management',
         'compliance_matrix',
-        'full_report_markdown',
         'status',
         'generated_file_path',
         'generated_at',
