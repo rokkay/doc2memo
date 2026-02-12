@@ -41,17 +41,6 @@
         </div>
     </section>
 
-    @if($document->extracted_text)
-        <section class="rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div class="border-b border-slate-200 px-4 py-4 sm:px-6 dark:border-slate-800">
-                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Texto extraido</h2>
-            </div>
-            <div class="max-h-[28rem] overflow-y-auto bg-slate-50 p-4 sm:p-6 dark:bg-slate-800/60">
-                <pre class="whitespace-pre-wrap text-sm leading-6 text-slate-700 dark:text-slate-200">{{ $document->extracted_text }}</pre>
-            </div>
-        </section>
-    @endif
-
     @if($document->document_type === 'pca' && $document->extractedCriteria->isNotEmpty())
         <section class="rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div class="border-b border-slate-200 px-4 py-4 sm:px-6 dark:border-slate-800">
@@ -59,7 +48,7 @@
                 <p class="text-sm text-slate-500 dark:text-slate-400">{{ $document->extractedCriteria->count() }} criterios</p>
             </div>
 
-            <div class="max-h-[24rem] space-y-2 overflow-y-auto px-4 py-4 sm:px-6">
+            <div class="grid max-h-[24rem] grid-cols-1 gap-3 overflow-y-auto px-4 py-4 sm:px-6 xl:grid-cols-2">
                 @foreach($document->extractedCriteria as $criterion)
                     @php
                         $variant = match($criterion->priority) {
@@ -114,6 +103,47 @@
                     </article>
                 @endforeach
             </div>
+        </section>
+    @endif
+
+    @if($document->extracted_text)
+        @php
+            $extractedTextLength = mb_strlen($document->extracted_text);
+        @endphp
+
+        <section class="rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <details class="group overflow-hidden rounded-3xl">
+                <summary class="list-none cursor-pointer bg-gradient-to-r from-slate-100 to-white px-4 py-4 marker:content-none sm:px-6 dark:from-slate-900 dark:to-slate-900">
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="flex min-w-0 items-center gap-3">
+                            <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h8M8 11h8M8 15h5M6 3h12a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V5a2 2 0 012-2z" />
+                                </svg>
+                            </span>
+                            <div class="min-w-0">
+                                <p class="truncate text-sm font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200">Texto extraido</p>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">{{ number_format($extractedTextLength) }} caracteres</p>
+                            </div>
+                        </div>
+
+                        <div class="inline-flex items-center gap-2">
+                            <span class="hidden rounded-full bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 sm:inline dark:bg-slate-800 dark:text-slate-300">Mostrar contenido completo</span>
+                            <svg class="h-5 w-5 text-slate-500 transition duration-200 group-open:rotate-180 dark:text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
+                            </svg>
+                        </div>
+                    </div>
+                </summary>
+
+                <div class="border-t border-slate-200 bg-slate-50/80 px-4 py-3 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-400">
+                    Revisa el texto original extraido por OCR para validar criterios y especificaciones detectadas.
+                </div>
+
+                <div class="max-h-[28rem] overflow-y-auto bg-white p-4 sm:p-6 dark:bg-slate-900">
+                    <pre class="whitespace-pre-wrap text-sm leading-6 text-slate-700 dark:text-slate-200">{{ $document->extracted_text }}</pre>
+                </div>
+            </details>
         </section>
     @endif
 </div>

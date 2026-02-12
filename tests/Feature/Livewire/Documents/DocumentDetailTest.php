@@ -46,6 +46,8 @@ it('displays extracted text when available', function (): void {
 
     Livewire::test(DocumentDetail::class, ['document' => $document])
         ->assertSee('Texto extraido')
+        ->assertSee('Mostrar contenido completo')
+        ->assertSeeHtml('<details class="group')
         ->assertSee('Este es el texto extraido del documento.');
 });
 
@@ -68,6 +70,7 @@ it('displays extracted criteria for pca documents', function (): void {
         ->assertSee('Criterios extraidos (PCA)')
         ->assertSee('Capacidad tecnica')
         ->assertSee('Debe aportar experiencia en proyectos similares.')
+        ->assertSeeHtml('xl:grid-cols-2')
         ->assertSee('Mandatory');
 });
 
