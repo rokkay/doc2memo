@@ -28,6 +28,18 @@ it('downloads the technical memory in pdf format', function (): void {
 
     Pdf::assertRespondedWithPdf(function (PdfBuilder $pdf): bool {
         return $pdf->isDownload()
-            && $pdf->downloadName === 'Memoria_Tecnica_REF-123.pdf';
+            && $pdf->downloadName === 'Memoria_Tecnica_REF-123.pdf'
+            && $pdf->viewName === 'technical-memories.pdf'
+            && $pdf->headerViewName === 'technical-memories.pdf-header'
+            && $pdf->footerViewName === 'technical-memories.pdf-footer'
+            && $pdf->format === 'a4'
+            && $pdf->margins === [
+                'top' => 24.0,
+                'right' => 14.0,
+                'bottom' => 20.0,
+                'left' => 14.0,
+                'unit' => 'mm',
+            ]
+            && $pdf->contains(['Documento técnico', '## Introducción', 'Página @pageNumber de @totalPages']);
     });
 });

@@ -6,6 +6,7 @@ use App\Models\TechnicalMemory;
 use App\Models\Tender;
 use App\Support\TechnicalMemorySections;
 use Illuminate\View\View;
+use Spatie\LaravelPdf\Enums\Format;
 use Spatie\LaravelPdf\PdfBuilder;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -44,6 +45,12 @@ class TechnicalMemoryController extends Controller
                 'technicalMemory' => $technicalMemory,
                 'sections' => $sections,
             ])
+            ->headerView('technical-memories.pdf-header', [
+                'technicalMemory' => $technicalMemory,
+            ])
+            ->footerView('technical-memories.pdf-footer')
+            ->format(Format::A4)
+            ->margins(top: 24, right: 14, bottom: 20, left: 14, unit: 'mm')
             ->name('Memoria_Tecnica_'.($technicalMemory->tender->reference_number ?: $technicalMemory->id).'.pdf')
             ->download();
     }
