@@ -36,7 +36,7 @@ it('creates draft memory and dispatches one section job per section', function (
         'tender_id' => $tender->id,
         'document_id' => $pcaDocument->id,
         'section_title' => 'Criterio de solvencia',
-        'description' => 'Acreditar experiencia en proyectos similares.',
+        'description' => "1) Experiencia demostrable en proyectos similares.\n2) Equipo con perfiles certificados.",
         'priority' => 'mandatory',
     ]);
 
@@ -69,7 +69,10 @@ it('creates draft memory and dispatches one section job per section', function (
             'quality_assurance',
             'risk_management',
             'compliance_matrix',
-        ], true);
+        ], true)
+            && data_get($job->pcaData, 'evaluation_points.0.section_title') === 'Criterio de solvencia'
+            && data_get($job->pcaData, 'evaluation_points.0.points.0') === 'Experiencia demostrable en proyectos similares.'
+            && data_get($job->pcaData, 'evaluation_points.0.points.1') === 'Equipo con perfiles certificados.';
     });
 
     $memory = $tender->fresh()->technicalMemory;

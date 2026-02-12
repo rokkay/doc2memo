@@ -43,6 +43,9 @@ Debes:
 - Evitar relleno, vaguedades y afirmaciones genericas.
 - Incluir medidas verificables, entregables y criterios claros cuando aplique.
 - Mantener coherencia con los criterios administrativos y tecnicos detectados.
+- Desarrollar narrativa profunda en espanol profesional (no listas breves sin contexto).
+- Explicar por que cada decision tecnica aporta valor y como sera evaluada.
+- Incorporar de forma explicita los puntos de evaluacion de criterios cuando existan.
 INSTRUCTIONS;
     }
 
@@ -119,8 +122,17 @@ Generate only this section of a technical memory (Memoria Tecnica): {$this->sect
 ## INSIGHTS DE VALOR (PCA + PPT):
 {$this->buildInsights()}
 
+## EVALUATION CRITERIA POINTS (PCA):
+{$this->buildEvaluationPoints()}
+
 ## SECTION OBJECTIVE
 {$this->sectionObjective()}
+
+## WRITING REQUIREMENTS
+- Write a rich narrative with concrete details and clear rationale.
+- Prefer 4-7 substantial paragraphs with smooth transitions.
+- When criteria points are available, reference them explicitly and explain compliance strategy.
+- Include measurable commitments, verification mechanisms, and expected impact.
 
 {$outputRequirement}
 PROMPT;
@@ -131,6 +143,13 @@ PROMPT;
         $insights = array_merge($this->pcaData['insights'] ?? [], $this->pptData['insights'] ?? []);
 
         return json_encode($insights, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) ?: '[]';
+    }
+
+    private function buildEvaluationPoints(): string
+    {
+        $points = $this->pcaData['evaluation_points'] ?? [];
+
+        return json_encode($points, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) ?: '[]';
     }
 
     protected function value(mixed $response, string $key, mixed $default): mixed

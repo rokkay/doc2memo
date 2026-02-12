@@ -12,16 +12,26 @@ final class GenerateTechnicalMemoryAction
 {
     public function __invoke(Tender $tender): void
     {
+        $criteria = $tender->extractedCriteria()
+            ->orderBy('id')
+            ->get();
+
         $pcaData = [
-            'criteria' => $tender->extractedCriteria()
-                ->orderBy('id')
-                ->get()
+            'criteria' => $criteria
                 ->map(fn ($item) => [
                     'section_number' => $item->section_number,
                     'section_title' => $item->section_title,
                     'description' => $item->description,
                     'priority' => $item->priority,
                     'metadata' => $item->metadata,
+                ])
+                ->all(),
+            'evaluation_points' => $criteria
+                ->map(fn ($item) => [
+                    'section_number' => $item->section_number,
+                    'section_title' => $item->section_title,
+                    'priority' => $item->priority,
+                    'points' => $this->extractEvaluationPoints((string) $item->description, is_array($item->metadata) ? $item->metadata : []),
                 ])
                 ->all(),
             'insights' => $tender->documentInsights()
@@ -98,5 +108,48 @@ final class GenerateTechnicalMemoryAction
                 pptData: $pptData,
             );
         }
+    }
+
+    /**
+     * @param  array<string,mixed>  $metadata
+     * @return array<int,string>
+     */
+    private function extractEvaluationPoints(string $description, array $metadata): array
+    {
+        $metadataPoints = collect([
+            $metadata['evaluation_points'] ?? null,
+            $metadata['criteria_points'] ?? null,
+            $metadata['scoring_points'] ?? null,
+            $metadata['puntos_evaluacion'] ?? null,
+            $metadata['points'] ?? null,
+        ])
+            ->flatten(1)
+            ->map(fn (mixed $point): string => trim((string) $point))
+            ->filter(fn (string $point): bool => $point !== '')
+            ->values();
+
+        if ($metadataPoints->isNotEmpty()) {
+            return $metadataPoints->take(8)->all();
+        }
+
+        $text = str_replace(["\r\n", "\r"], "\n", $description);
+
+        $points = collect(preg_split('/\n+|\s*;\s*/', $text) ?: [])
+            ->map(function (string $segment): string {
+                $segment = trim($segment);
+                $segment = preg_replace('/^[-*]\s+/', '', $segment) ?? $segment;
+                $segment = preg_replace('/^\d+[\)\.-]?\s+/', '', $segment) ?? $segment;
+
+                return trim($segment);
+            })
+            ->filter(fn (string $segment): bool => $segment !== '')
+            ->unique()
+            ->values();
+
+        if ($points->isEmpty()) {
+            return [$description];
+        }
+
+        return $points->take(8)->all();
     }
 }
