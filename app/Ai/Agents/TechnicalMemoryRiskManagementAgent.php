@@ -18,11 +18,11 @@ class TechnicalMemoryRiskManagementAgent extends TechnicalMemorySectionAgent
 
     protected function sectionTitle(): string
     {
-        return 'Gestion de Riesgos';
+        return 'Gestión de Riesgos';
     }
 
     protected function sectionObjective(): string
     {
-        return 'Construye un plan de riesgos accionable con identificacion, valoracion, medidas de mitigacion, responsables y planes de contingencia.';
+        return 'Construye un plan de riesgos accionable con identificación, valoración, medidas de mitigación, responsables y planes de contingencia.';
     }
 }

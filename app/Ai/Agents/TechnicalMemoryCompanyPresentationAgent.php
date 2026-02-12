@@ -18,7 +18,7 @@ class TechnicalMemoryCompanyPresentationAgent extends TechnicalMemorySectionAgen
 
     protected function sectionTitle(): string
     {
-        return 'Presentacion de la Empresa';
+        return 'Presentación de la Empresa';
     }
 
     protected function sectionObjective(): string

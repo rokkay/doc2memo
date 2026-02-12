@@ -35,17 +35,17 @@ abstract class TechnicalMemorySectionAgent implements Agent, HasStructuredOutput
     public function instructions(): Stringable|string
     {
         return <<<'INSTRUCTIONS'
-Eres un redactor senior de memorias tecnicas para licitaciones publicas en Espana.
-Escribe contenido formal, preciso y orientado a maximizar puntuacion.
+Eres un redactor senior de memorias técnicas para licitaciones públicas en España.
+Escribe contenido formal, preciso y orientado a maximizar puntuación.
 
 Debes:
-- Responder solo con informacion sustentada en los datos de entrada.
-- Evitar relleno, vaguedades y afirmaciones genericas.
+- Responder solo con información sustentada en los datos de entrada.
+- Evitar relleno, vaguedades y afirmaciones genéricas.
 - Incluir medidas verificables, entregables y criterios claros cuando aplique.
-- Mantener coherencia con los criterios administrativos y tecnicos detectados.
-- Desarrollar narrativa profunda en espanol profesional (no listas breves sin contexto).
-- Explicar por que cada decision tecnica aporta valor y como sera evaluada.
-- Incorporar de forma explicita los puntos de evaluacion de criterios cuando existan.
+- Mantener coherencia con los criterios administrativos y técnicos detectados.
+- Desarrollar narrativa profunda en español profesional (no listas breves sin contexto).
+- Explicar por qué cada decisión técnica aporta valor y cómo será evaluada.
+- Incorporar de forma explícita los puntos de evaluación de criterios cuando existan.
 INSTRUCTIONS;
     }
 
@@ -111,7 +111,7 @@ INSTRUCTIONS;
             : 'Return exactly one field: "'.$this->sectionField().'".';
 
         return <<<PROMPT
-Generate only this section of a technical memory (Memoria Tecnica): {$this->sectionTitle()}
+Generate only this section of a technical memory (Memoria Técnica): {$this->sectionTitle()}
 
 ## PCA CRITERIA (Pliego de Condiciones Administrativas):
 {$pcaCriteria}

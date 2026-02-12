@@ -11,23 +11,23 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
             </div>
-            <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-100">No hay memoria tecnica generada</h3>
-            <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">La memoria tecnica aun no ha sido generada para esta licitacion.</p>
+            <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-100">No hay memoria técnica generada</h3>
+            <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">La memoria técnica aún no ha sido generada para esta licitación.</p>
             <a href="{{ route('tenders.show', $tender) }}" class="mt-6 inline-flex items-center rounded-lg bg-sky-100 px-4 py-2 text-sm font-medium text-sky-700 hover:bg-sky-200 dark:bg-sky-900/40 dark:text-sky-300 dark:hover:bg-sky-900/60">
-                Volver a la licitacion
+                Volver a la licitación
             </a>
         </div>
     @else
         @php
             $sections = collect([
-                ['id' => 'introduccion', 'title' => '1. Introduccion', 'content' => $memory->introduction],
-                ['id' => 'presentacion', 'title' => '2. Presentacion de la Empresa', 'content' => $memory->company_presentation],
-                ['id' => 'enfoque', 'title' => '3. Enfoque Tecnico', 'content' => $memory->technical_approach],
-                ['id' => 'metodologia', 'title' => '4. Metodologia', 'content' => $memory->methodology],
+                ['id' => 'introduccion', 'title' => '1. Introducción', 'content' => $memory->introduction],
+                ['id' => 'presentacion', 'title' => '2. Presentación de la Empresa', 'content' => $memory->company_presentation],
+                ['id' => 'enfoque', 'title' => '3. Enfoque Técnico', 'content' => $memory->technical_approach],
+                ['id' => 'metodologia', 'title' => '4. Metodología', 'content' => $memory->methodology],
                 ['id' => 'equipo', 'title' => '5. Estructura del Equipo', 'content' => $memory->team_structure],
                 ['id' => 'cronograma', 'title' => '6. Cronograma', 'content' => $memory->timeline],
                 ['id' => 'calidad', 'title' => '7. Aseguramiento de Calidad', 'content' => $memory->quality_assurance],
-                ['id' => 'riesgos', 'title' => '8. Gestion de Riesgos', 'content' => $memory->risk_management],
+                ['id' => 'riesgos', 'title' => '8. Gestión de Riesgos', 'content' => $memory->risk_management],
                 ['id' => 'cumplimiento', 'title' => '9. Matriz de Cumplimiento', 'content' => $memory->compliance_matrix],
             ])->filter(fn (array $section): bool => filled($section['content']))->values();
 
@@ -90,9 +90,9 @@
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        <p class="text-sm font-medium text-sky-900 dark:text-sky-200">Generando memoria tecnica por secciones</p>
+                        <p class="text-sm font-medium text-sky-900 dark:text-sky-200">Generando memoria técnica por secciones</p>
                     </div>
-                    <p class="mt-2 text-sm text-sky-800 dark:text-sky-300">Cada seccion se ira habilitando automaticamente en cuanto este lista.</p>
+                    <p class="mt-2 text-sm text-sky-800 dark:text-sky-300">Cada sección se irá habilitando automáticamente en cuanto esté lista.</p>
                 </div>
             @endif
 
@@ -101,13 +101,13 @@
                 <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div class="space-y-2">
                         <div class="inline-flex items-center rounded-full bg-cyan-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-200">
-                            Memoria Tecnica
+                            Memoria Técnica
                         </div>
-                        <h1 class="text-2xl font-bold text-slate-900 dark:text-slate-100">{{ $memory->title ?: 'Memoria Tecnica' }}</h1>
+                        <h1 class="text-2xl font-bold text-slate-900 dark:text-slate-100">{{ $memory->title ?: 'Memoria Técnica' }}</h1>
                         @if($memory->generated_at)
                             <p class="text-sm text-slate-600 dark:text-slate-300">Generada el {{ $memory->generated_at->format('d/m/Y H:i') }}</p>
                         @else
-                            <p class="text-sm text-slate-600 dark:text-slate-300">Generacion en curso</p>
+                            <p class="text-sm text-slate-600 dark:text-slate-300">Generación en curso</p>
                         @endif
                     </div>
 
@@ -140,7 +140,7 @@
         <section class="rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div class="border-b border-slate-200 px-4 py-4 sm:px-6 dark:border-slate-800">
                 <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Resumen ejecutivo</h2>
-                <p class="text-sm text-slate-600 dark:text-slate-300">Vista rapida para revisar alcance, esfuerzo y criterios antes de entrar al detalle.</p>
+                <p class="text-sm text-slate-600 dark:text-slate-300">Vista rápida para revisar alcance, esfuerzo y criterios antes de entrar al detalle.</p>
             </div>
 
             <div class="grid grid-cols-1 gap-3 border-b border-slate-200 px-4 py-4 sm:grid-cols-2 xl:grid-cols-4 sm:px-6 dark:border-slate-800">
@@ -149,11 +149,11 @@
                     <p class="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{{ $estimatedReadingMinutes }} min</p>
                 </div>
                 <div class="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/70">
-                    <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Criterios de evaluacion</p>
+                    <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Criterios de evaluación</p>
                     <p class="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{{ $criteriaCount }}</p>
                 </div>
                 <div class="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/70">
-                    <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Especificaciones tecnicas</p>
+                    <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Especificaciones técnicas</p>
                     <p class="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{{ $specificationsCount }}</p>
                 </div>
                 <div class="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/70">
@@ -167,7 +167,7 @@
         <section class="grid grid-cols-1 gap-6 xl:grid-cols-12">
             <aside class="xl:col-span-3">
                 <div class="sticky top-24 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                    <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Indice</h2>
+                    <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Índice</h2>
                     <ul class="mt-3 space-y-2">
                         @foreach($sections as $section)
                             <li>
@@ -298,8 +298,8 @@
                                 <div class="bg-emerald-50 px-4 py-3 dark:bg-emerald-950/30">
                                     <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                                         <div>
-                                            <h3 class="text-sm font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-300">Matriz de verificacion rapida</h3>
-                                            <p class="mt-1 text-xs text-emerald-700 dark:text-emerald-400">Cruce directo entre criterios detectados y puntos de evaluacion para agilizar la revision.</p>
+                                            <h3 class="text-sm font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-300">Matriz de verificación rápida</h3>
+                                            <p class="mt-1 text-xs text-emerald-700 dark:text-emerald-400">Cruce directo entre criterios detectados y puntos de evaluación para agilizar la revisión.</p>
                                         </div>
                                         <div class="flex flex-wrap items-center gap-2">
                                             <button wire:click.prevent="setCriteriaPriorityFilter('all')" type="button" class="inline-flex cursor-pointer items-center rounded-md px-2.5 py-1.5 text-xs font-semibold ring-1 {{ $this->criteriaPriorityFilter === 'all' ? 'bg-emerald-100 text-emerald-800 ring-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-200 dark:ring-emerald-700' : 'bg-white text-emerald-700 ring-emerald-300 hover:bg-emerald-100 dark:bg-slate-900 dark:text-emerald-300 dark:ring-emerald-800 dark:hover:bg-emerald-900/30' }}">
@@ -325,7 +325,7 @@
                                             <tr>
                                                 <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Criterio</th>
                                                 <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Prioridad</th>
-                                                <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Puntos de evaluacion</th>
+                                                <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Puntos de evaluación</th>
                                             </tr>
                                         </thead>
                                         <tbody class="divide-y divide-slate-200 dark:divide-slate-800">

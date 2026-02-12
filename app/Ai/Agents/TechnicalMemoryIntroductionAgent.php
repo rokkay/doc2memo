@@ -18,11 +18,11 @@ class TechnicalMemoryIntroductionAgent extends TechnicalMemorySectionAgent
 
     protected function sectionTitle(): string
     {
-        return 'Introduccion';
+        return 'Introducción';
     }
 
     protected function sectionObjective(): string
     {
-        return 'Redacta una apertura persuasiva que contextualice la licitacion, el alcance del servicio y la propuesta de valor. Debe anticipar enfoque, cumplimiento y resultados medibles.';
+        return 'Redacta una apertura persuasiva que contextualice la licitación, el alcance del servicio y la propuesta de valor. Debe anticipar enfoque, cumplimiento y resultados medibles.';
     }
 }

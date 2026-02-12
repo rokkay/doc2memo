@@ -18,11 +18,11 @@ class TechnicalMemoryTechnicalApproachAgent extends TechnicalMemorySectionAgent
 
     protected function sectionTitle(): string
     {
-        return 'Enfoque Tecnico';
+        return 'Enfoque Técnico';
     }
 
     protected function sectionObjective(): string
     {
-        return 'Define la solucion tecnica propuesta con decisiones concretas de arquitectura, seguridad, integracion, rendimiento y escalabilidad.';
+        return 'Define la solución técnica propuesta con decisiones concretas de arquitectura, seguridad, integración, rendimiento y escalabilidad.';
     }
 }

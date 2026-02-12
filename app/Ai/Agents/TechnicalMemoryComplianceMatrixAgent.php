@@ -23,6 +23,6 @@ class TechnicalMemoryComplianceMatrixAgent extends TechnicalMemorySectionAgent
 
     protected function sectionObjective(): string
     {
-        return 'Redacta una matriz narrativa que mapee requisitos relevantes del pliego con la respuesta tecnica y evidencias de cumplimiento.';
+        return 'Redacta una matriz narrativa que mapee requisitos relevantes del pliego con la respuesta técnica y evidencias de cumplimiento.';
     }
 }

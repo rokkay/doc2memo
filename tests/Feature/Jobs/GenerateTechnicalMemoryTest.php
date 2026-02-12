@@ -53,7 +53,7 @@ it('creates draft memory and dispatches one section job per section', function (
     assertDatabaseHas('technical_memories', [
         'tender_id' => $tender->id,
         'status' => 'draft',
-        'title' => 'Memoria Tecnica - '.$tender->title,
+        'title' => 'Memoria Técnica - '.$tender->title,
     ]);
 
     Queue::assertPushedTimes(GenerateTechnicalMemorySection::class, 9);

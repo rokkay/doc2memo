@@ -2,13 +2,13 @@
     <section class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div class="bg-gradient-to-r from-sky-100 via-cyan-50 to-white px-4 py-6 sm:px-6 dark:from-sky-950/40 dark:via-slate-900 dark:to-slate-900">
             <h1 class="text-2xl font-bold text-slate-900 dark:text-slate-100">Nueva Licitación</h1>
-            <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">Completa los datos generales y sube los dos pliegos para iniciar el analisis automatico.</p>
+            <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">Completa los datos generales y sube los dos pliegos para iniciar el análisis automático.</p>
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Los campos marcados con * son obligatorios.</p>
         </div>
 
         <form wire:submit="save" class="space-y-6 px-4 py-5 sm:px-6">
             <section class="rounded-2xl border border-slate-200 p-4 dark:border-slate-700">
-                <h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">Datos de la licitacion</h2>
+                <h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">Datos de la licitación</h2>
 
                 <div class="mt-4 grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
                     <div class="sm:col-span-2">

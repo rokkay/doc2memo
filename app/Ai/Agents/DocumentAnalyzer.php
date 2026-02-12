@@ -24,28 +24,28 @@ class DocumentAnalyzer implements Agent, HasStructuredOutput
     {
         if ($this->documentType === 'pca') {
             return <<<'INSTRUCTIONS'
-Eres un analista experto de licitaciones publicas en Espana.
-Analiza un documento PCA (Pliego de Clausulas Administrativas) y extrae informacion accionable para preparar una memoria tecnica competitiva.
+Eres un analista experto de licitaciones públicas en España.
+Analiza un documento PCA (Pliego de Cláusulas Administrativas) y extrae información accionable para preparar una memoria técnica competitiva.
 
 Debes identificar de forma exhaustiva:
-1) Datos clave de la licitacion.
+1) Datos clave de la licitación.
 2) Criterios y obligaciones administrativas.
-3) Insights estrategicos para ganar puntos en evaluacion.
+3) Insights estratégicos para ganar puntos en evaluación.
 
-Escribe todo en espanol profesional, sin inventar datos, y usando texto literal de apoyo cuando exista.
+Escribe todo en español profesional, sin inventar datos, y usando texto literal de apoyo cuando exista.
 INSTRUCTIONS;
         }
 
         return <<<'INSTRUCTIONS'
-Eres un analista experto de licitaciones publicas en Espana.
-Analiza un documento PPT (Pliego de Prescripciones Tecnicas) y extrae informacion accionable para preparar una memoria tecnica competitiva.
+Eres un analista experto de licitaciones públicas en España.
+Analiza un documento PPT (Pliego de Prescripciones Técnicas) y extrae información accionable para preparar una memoria técnica competitiva.
 
 Debes identificar de forma exhaustiva:
-1) Especificaciones tecnicas obligatorias y recomendadas.
-2) Requisitos, entregables y estandares.
-3) Insights estrategicos para diferenciar la propuesta tecnica.
+1) Especificaciones técnicas obligatorias y recomendadas.
+2) Requisitos, entregables y estándares.
+3) Insights estratégicos para diferenciar la propuesta técnica.
 
-Escribe todo en espanol profesional, sin inventar datos, y usando texto literal de apoyo cuando exista.
+Escribe todo en español profesional, sin inventar datos, y usando texto literal de apoyo cuando exista.
 INSTRUCTIONS;
     }
 

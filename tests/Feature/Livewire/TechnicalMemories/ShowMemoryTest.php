@@ -42,14 +42,14 @@ it('displays all sections when present', function (): void {
     Livewire::test(ShowMemory::class, ['tender' => $tender])
         ->assertSee('Resumen ejecutivo')
         ->assertSee('Tiempo estimado lectura')
-        ->assertSee('1. Introduccion')
-        ->assertSee('2. Presentacion de la Empresa')
-        ->assertSee('3. Enfoque Tecnico')
-        ->assertSee('4. Metodologia')
+        ->assertSee('1. Introducción')
+        ->assertSee('2. Presentación de la Empresa')
+        ->assertSee('3. Enfoque Técnico')
+        ->assertSee('4. Metodología')
         ->assertSee('5. Estructura del Equipo')
         ->assertSee('6. Cronograma')
         ->assertSee('7. Aseguramiento de Calidad')
-        ->assertSee('8. Gestion de Riesgos')
+        ->assertSee('8. Gestión de Riesgos')
         ->assertSee('9. Matriz de Cumplimiento')
         ->assertSee('Texto de introduccion')
         ->assertSee('Texto de presentacion')
@@ -142,9 +142,9 @@ it('shows empty state when no memory exists', function (): void {
     $tender = Tender::factory()->create();
 
     Livewire::test(ShowMemory::class, ['tender' => $tender])
-        ->assertSee('No hay memoria tecnica generada')
-        ->assertSee('La memoria tecnica aun no ha sido generada para esta licitacion.')
-        ->assertSee('Volver a la licitacion')
+        ->assertSee('No hay memoria técnica generada')
+        ->assertSee('La memoria técnica aún no ha sido generada para esta licitación.')
+        ->assertSee('Volver a la licitación')
         ->assertSee(route('tenders.show', $tender));
 });
 
@@ -153,7 +153,7 @@ it('polls and shows section progress while memory generation is in draft', funct
 
     TechnicalMemory::factory()->create([
         'tender_id' => $tender->id,
-        'title' => 'Memoria Tecnica - '.$tender->title,
+        'title' => 'Memoria Técnica - '.$tender->title,
         'status' => 'draft',
         'generated_at' => null,
         'introduction' => 'Primer bloque completado.',
@@ -168,8 +168,8 @@ it('polls and shows section progress while memory generation is in draft', funct
     ]);
 
     Livewire::test(ShowMemory::class, ['tender' => $tender])
-        ->assertSee('Generando memoria tecnica por secciones')
-        ->assertSee('Generacion en curso')
+        ->assertSee('Generando memoria técnica por secciones')
+        ->assertSee('Generación en curso')
         ->assertSee('1/9')
         ->assertSeeHtml('wire:poll.2s.visible="refreshMemory"');
 });
@@ -231,12 +231,12 @@ it('shows quick verification matrix in compliance section when criteria exist', 
 
     TechnicalMemory::factory()->create([
         'tender_id' => $tender->id,
-        'compliance_matrix' => 'Bloque de cumplimiento amplio con estrategia de verificacion.',
+        'compliance_matrix' => 'Bloque de cumplimiento amplio con estrategia de verificación.',
     ]);
 
     Livewire::test(ShowMemory::class, ['tender' => $tender])
-        ->assertSee('Matriz de verificacion rapida')
-        ->assertSee('Puntos de evaluacion')
+        ->assertSee('Matriz de verificación rápida')
+        ->assertSee('Puntos de evaluación')
         ->assertSee('Criterio tecnico')
         ->assertSee('Plan de migracion')
         ->assertSee('Mostrando 1 de 1 criterios');

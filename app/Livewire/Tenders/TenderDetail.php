@@ -132,7 +132,7 @@ class TenderDetail extends Component
             $this->tender->technicalMemory()->updateOrCreate(
                 ['tender_id' => $this->tender->id],
                 [
-                    'title' => 'Generando memoria tecnica...',
+                    'title' => 'Generando memoria técnica...',
                     'introduction' => null,
                     'company_presentation' => null,
                     'technical_approach' => null,

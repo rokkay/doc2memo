@@ -41,14 +41,14 @@ it('displays document info', function (): void {
 
 it('displays extracted text when available', function (): void {
     $document = Document::factory()->create([
-        'extracted_text' => 'Este es el texto extraido del documento.',
+        'extracted_text' => 'Este es el texto extraído del documento.',
     ]);
 
     Livewire::test(DocumentDetail::class, ['document' => $document])
-        ->assertSee('Texto extraido')
+        ->assertSee('Texto extraído')
         ->assertSee('Mostrar contenido completo')
         ->assertSeeHtml('<details class="group')
-        ->assertSee('Este es el texto extraido del documento.');
+        ->assertSee('Este es el texto extraído del documento.');
 });
 
 it('displays extracted criteria for pca documents', function (): void {
@@ -67,7 +67,7 @@ it('displays extracted criteria for pca documents', function (): void {
     ]);
 
     Livewire::test(DocumentDetail::class, ['document' => $document])
-        ->assertSee('Criterios extraidos (PCA)')
+        ->assertSee('Criterios extraídos (PCA)')
         ->assertSee('Capacidad tecnica')
         ->assertSee('Debe aportar experiencia en proyectos similares.')
         ->assertSeeHtml('xl:grid-cols-2')
@@ -90,7 +90,7 @@ it('displays extracted specifications for ppt documents', function (): void {
     ]);
 
     Livewire::test(DocumentDetail::class, ['document' => $document])
-        ->assertSee('Especificaciones extraidas (PPT)')
+        ->assertSee('Especificaciones extraídas (PPT)')
         ->assertSee('Arquitectura de la solucion')
         ->assertSee('Se requiere arquitectura escalable basada en microservicios.')
         ->assertSee('Compatibilidad con API REST.');

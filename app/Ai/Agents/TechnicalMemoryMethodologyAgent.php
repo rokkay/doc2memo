@@ -18,11 +18,11 @@ class TechnicalMemoryMethodologyAgent extends TechnicalMemorySectionAgent
 
     protected function sectionTitle(): string
     {
-        return 'Metodologia';
+        return 'Metodología';
     }
 
     protected function sectionObjective(): string
     {
-        return 'Explica metodologia de ejecucion por fases, modelo de gobernanza, hitos de seguimiento, ciclos de validacion y comunicacion con el organismo contratante.';
+        return 'Explica metodología de ejecución por fases, modelo de gobernanza, hitos de seguimiento, ciclos de validación y comunicación con el organismo contratante.';
     }
 }

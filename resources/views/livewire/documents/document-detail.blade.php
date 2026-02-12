@@ -25,7 +25,7 @@
                 <p class="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{{ $this->documentTypeLabel }}</p>
             </div>
             <div class="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/70">
-                <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Tamano</p>
+                <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Tamaño</p>
                 <p class="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{{ number_format($document->file_size / 1024, 2) }} KB</p>
             </div>
             <div class="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/70">
@@ -44,7 +44,7 @@
     @if($document->document_type === 'pca' && $document->extractedCriteria->isNotEmpty())
         <section class="rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div class="border-b border-slate-200 px-4 py-4 sm:px-6 dark:border-slate-800">
-                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Criterios extraidos (PCA)</h2>
+                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Criterios extraídos (PCA)</h2>
                 <p class="text-sm text-slate-500 dark:text-slate-400">{{ $document->extractedCriteria->count() }} criterios</p>
             </div>
 
@@ -84,7 +84,7 @@
     @if($document->document_type === 'ppt' && $document->extractedSpecifications->isNotEmpty())
         <section class="rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div class="border-b border-slate-200 px-4 py-4 sm:px-6 dark:border-slate-800">
-                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Especificaciones extraidas (PPT)</h2>
+                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Especificaciones extraídas (PPT)</h2>
                 <p class="text-sm text-slate-500 dark:text-slate-400">{{ $document->extractedSpecifications->count() }} especificaciones</p>
             </div>
 
@@ -128,7 +128,7 @@
                                 </svg>
                             </span>
                             <div class="min-w-0">
-                                <p class="truncate text-sm font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200">Texto extraido</p>
+                                <p class="truncate text-sm font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200">Texto extraído</p>
                                 <p class="text-xs text-slate-500 dark:text-slate-400">{{ number_format($extractedTextLength) }} caracteres</p>
                             </div>
                         </div>
@@ -143,7 +143,7 @@
                 </summary>
 
                 <div class="border-t border-slate-200 bg-slate-50/80 px-4 py-3 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-400">
-                    Revisa el texto original extraido por OCR para validar criterios y especificaciones detectadas.
+                    Revisa el texto original extraído por OCR para validar criterios y especificaciones detectadas.
                 </div>
 
                 <div class="max-h-[28rem] overflow-y-auto bg-white p-4 sm:p-6 dark:bg-slate-900">

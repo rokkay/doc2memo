@@ -42,7 +42,7 @@ it('marks memory as generated when the last section finishes', function (): void
 
     $memory = TechnicalMemory::factory()->create([
         'tender_id' => $tender->id,
-        'title' => 'Memoria Tecnica - '.$tender->title,
+        'title' => 'Memoria Técnica - '.$tender->title,
         'status' => 'draft',
         'generated_at' => null,
         'introduction' => 'Contenido 1',

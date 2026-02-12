@@ -82,7 +82,7 @@ final class GenerateTechnicalMemoryAction
         $memory = $tender->technicalMemory()->updateOrCreate(
             ['tender_id' => $tender->id],
             [
-                'title' => 'Memoria Tecnica - '.$tender->title,
+                'title' => 'Memoria Técnica - '.$tender->title,
                 'introduction' => null,
                 'company_presentation' => null,
                 'technical_approach' => null,

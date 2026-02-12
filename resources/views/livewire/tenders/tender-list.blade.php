@@ -4,7 +4,7 @@
             <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                 <div class="space-y-2">
                     <div class="inline-flex items-center rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-sky-700 dark:bg-sky-900/40 dark:text-sky-200">
-                        Gestion de Licitaciones
+                        Gestión de Licitaciones
                     </div>
                     <h1 class="text-2xl font-bold text-slate-900 dark:text-slate-100">Licitaciones</h1>
                     <p class="text-sm text-slate-600 dark:text-slate-300">Centraliza seguimiento, estado documental y acceso rápido a memoria técnica.</p>
@@ -23,7 +23,7 @@
                     wire:model.live.debounce.300ms="search"
                     type="text"
                     id="search"
-                    placeholder="Buscar por titulo, empresa o referencia..."
+                    placeholder="Buscar por título, empresa o referencia..."
                     class="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-slate-900 shadow-sm transition placeholder:text-slate-400 focus:border-sky-500 focus:outline-none focus:ring-4 focus:ring-sky-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
                 >
             </div>
@@ -61,7 +61,7 @@
                 <table class="min-w-full table-fixed divide-y divide-slate-200 dark:divide-slate-800">
                     <thead class="bg-slate-50 dark:bg-slate-800/70">
                         <tr>
-                            <th class="w-[38%] px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Titulo</th>
+                            <th class="w-[38%] px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Título</th>
                             <th class="w-[24%] px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Empresa</th>
                             <th class="w-[14%] px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Estado</th>
                             <th class="w-[10%] px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Documentos</th>

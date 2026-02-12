@@ -42,14 +42,14 @@ class TechnicalMemorySections
     public static function title(string $field): string
     {
         return match ($field) {
-            'introduction' => 'Introduccion',
-            'company_presentation' => 'Presentacion de la Empresa',
-            'technical_approach' => 'Enfoque Tecnico',
-            'methodology' => 'Metodologia',
+            'introduction' => 'Introducción',
+            'company_presentation' => 'Presentación de la Empresa',
+            'technical_approach' => 'Enfoque Técnico',
+            'methodology' => 'Metodología',
             'team_structure' => 'Estructura del Equipo',
             'timeline' => 'Cronograma',
             'quality_assurance' => 'Aseguramiento de Calidad',
-            'risk_management' => 'Gestion de Riesgos',
+            'risk_management' => 'Gestión de Riesgos',
             'compliance_matrix' => 'Matriz de Cumplimiento',
             default => $field,
         };
