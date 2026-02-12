@@ -8,7 +8,8 @@
     "herd_mcp": false,
     "mcp": true,
     "packages": [
-        "laravel/ai"
+        "laravel/ai",
+        "spatie/laravel-pdf"
     ],
     "sail": false,
     "skills": [
@@ -16,6 +17,7 @@
         "pest-testing",
         "tailwindcss-development",
         "developing-with-ai-sdk",
+        "laravel-pdf",
         "brainstorming",
         "dispatching-parallel-agents",
         "executing-plans",
