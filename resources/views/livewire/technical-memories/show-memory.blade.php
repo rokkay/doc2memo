@@ -1,34 +1,51 @@
-@if(! $tender->technicalMemory)
-    <div class="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-            <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
+@php
+    $memory = $tender->technicalMemory;
+    $isGenerating = $memory && $memory->status === 'draft';
+@endphp
+
+<div @if(! $memory || $isGenerating) wire:poll.2s.visible="refreshMemory" @endif>
+    @if(! $memory)
+        <div class="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+            </div>
+            <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-100">No hay memoria tecnica generada</h3>
+            <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">La memoria tecnica aun no ha sido generada para esta licitacion.</p>
+            <a href="{{ route('tenders.show', $tender) }}" class="mt-6 inline-flex items-center rounded-lg bg-sky-100 px-4 py-2 text-sm font-medium text-sky-700 hover:bg-sky-200 dark:bg-sky-900/40 dark:text-sky-300 dark:hover:bg-sky-900/60">
+                Volver a la licitacion
+            </a>
         </div>
-        <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-100">No hay memoria tecnica generada</h3>
-        <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">La memoria tecnica aun no ha sido generada para esta licitacion.</p>
-        <a href="{{ route('tenders.show', $tender) }}" class="mt-6 inline-flex items-center rounded-lg bg-sky-100 px-4 py-2 text-sm font-medium text-sky-700 hover:bg-sky-200 dark:bg-sky-900/40 dark:text-sky-300 dark:hover:bg-sky-900/60">
-            Volver a la licitacion
-        </a>
-    </div>
-@else
-    @php
-        $memory = $tender->technicalMemory;
+    @else
+        @php
+            $sections = collect([
+                ['id' => 'introduccion', 'title' => '1. Introduccion', 'content' => $memory->introduction],
+                ['id' => 'presentacion', 'title' => '2. Presentacion de la Empresa', 'content' => $memory->company_presentation],
+                ['id' => 'enfoque', 'title' => '3. Enfoque Tecnico', 'content' => $memory->technical_approach],
+                ['id' => 'metodologia', 'title' => '4. Metodologia', 'content' => $memory->methodology],
+                ['id' => 'equipo', 'title' => '5. Estructura del Equipo', 'content' => $memory->team_structure],
+                ['id' => 'cronograma', 'title' => '6. Cronograma', 'content' => $memory->timeline],
+                ['id' => 'calidad', 'title' => '7. Aseguramiento de Calidad', 'content' => $memory->quality_assurance],
+                ['id' => 'riesgos', 'title' => '8. Gestion de Riesgos', 'content' => $memory->risk_management],
+                ['id' => 'cumplimiento', 'title' => '9. Matriz de Cumplimiento', 'content' => $memory->compliance_matrix],
+            ])->filter(fn (array $section): bool => filled($section['content']))->values();
+        @endphp
 
-        $sections = collect([
-            ['id' => 'introduccion', 'title' => '1. Introduccion', 'content' => $memory->introduction],
-            ['id' => 'presentacion', 'title' => '2. Presentacion de la Empresa', 'content' => $memory->company_presentation],
-            ['id' => 'enfoque', 'title' => '3. Enfoque Tecnico', 'content' => $memory->technical_approach],
-            ['id' => 'metodologia', 'title' => '4. Metodologia', 'content' => $memory->methodology],
-            ['id' => 'equipo', 'title' => '5. Estructura del Equipo', 'content' => $memory->team_structure],
-            ['id' => 'cronograma', 'title' => '6. Cronograma', 'content' => $memory->timeline],
-            ['id' => 'calidad', 'title' => '7. Aseguramiento de Calidad', 'content' => $memory->quality_assurance],
-            ['id' => 'riesgos', 'title' => '8. Gestion de Riesgos', 'content' => $memory->risk_management],
-            ['id' => 'cumplimiento', 'title' => '9. Matriz de Cumplimiento', 'content' => $memory->compliance_matrix],
-        ])->filter(fn (array $section): bool => filled($section['content']))->values();
-    @endphp
+        <div class="space-y-6">
+            @if($isGenerating)
+                <div class="rounded-2xl border border-sky-200 bg-sky-50 p-4 dark:border-sky-900 dark:bg-sky-950/30">
+                    <div class="flex items-center gap-2">
+                        <svg class="h-4 w-4 animate-spin text-sky-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <p class="text-sm font-medium text-sky-900 dark:text-sky-200">Generando memoria tecnica por secciones</p>
+                    </div>
+                    <p class="mt-2 text-sm text-sky-800 dark:text-sky-300">Cada seccion se ira habilitando automaticamente en cuanto este lista.</p>
+                </div>
+            @endif
 
-    <div class="space-y-6">
         <section class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div class="bg-gradient-to-r from-cyan-100 via-sky-50 to-white px-4 py-6 sm:px-6 dark:from-sky-950/40 dark:via-slate-900 dark:to-slate-900">
                 <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -36,8 +53,12 @@
                         <div class="inline-flex items-center rounded-full bg-cyan-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-200">
                             Memoria Tecnica
                         </div>
-                        <h1 class="text-2xl font-bold text-slate-900 dark:text-slate-100">{{ $memory->title }}</h1>
-                        <p class="text-sm text-slate-600 dark:text-slate-300">Generada el {{ $memory->generated_at?->format('d/m/Y H:i') }}</p>
+                        <h1 class="text-2xl font-bold text-slate-900 dark:text-slate-100">{{ $memory->title ?: 'Memoria Tecnica' }}</h1>
+                        @if($memory->generated_at)
+                            <p class="text-sm text-slate-600 dark:text-slate-300">Generada el {{ $memory->generated_at->format('d/m/Y H:i') }}</p>
+                        @else
+                            <p class="text-sm text-slate-600 dark:text-slate-300">Generacion en curso</p>
+                        @endif
                     </div>
 
                     <div class="flex flex-wrap items-center gap-2">
@@ -205,5 +226,6 @@
         <a href="#" class="fixed bottom-6 right-6 z-20 inline-flex items-center rounded-full border border-slate-300 bg-white/95 px-4 py-2 text-sm font-medium text-slate-700 shadow-md backdrop-blur transition hover:-translate-y-0.5 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900/95 dark:text-slate-200 dark:hover:bg-slate-800">
             Volver arriba
         </a>
-    </div>
-@endif
+        </div>
+    @endif
+</div>

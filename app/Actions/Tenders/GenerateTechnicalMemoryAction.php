@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace App\Actions\Tenders;
 
-use App\Ai\Agents\TechnicalMemoryGenerator;
+use App\Jobs\GenerateTechnicalMemorySection;
 use App\Models\Tender;
+use App\Support\TechnicalMemorySections;
 
 final class GenerateTechnicalMemoryAction
 {
@@ -68,27 +69,34 @@ final class GenerateTechnicalMemoryAction
                 ->all(),
         ];
 
-        $memoryData = (new TechnicalMemoryGenerator($pcaData, $pptData))->generate();
-
-        $tender->technicalMemory()->updateOrCreate(
+        $memory = $tender->technicalMemory()->updateOrCreate(
             ['tender_id' => $tender->id],
             [
-                'title' => (string) ($memoryData['title'] ?? 'Memoria Tecnica'),
-                'introduction' => (string) ($memoryData['introduction'] ?? ''),
-                'company_presentation' => (string) ($memoryData['company_presentation'] ?? ''),
-                'technical_approach' => (string) ($memoryData['technical_approach'] ?? ''),
-                'methodology' => (string) ($memoryData['methodology'] ?? ''),
-                'team_structure' => (string) ($memoryData['team_structure'] ?? ''),
-                'timeline' => (string) ($memoryData['timeline'] ?? ''),
-                'timeline_plan' => is_array($memoryData['timeline_plan'] ?? null) ? $memoryData['timeline_plan'] : null,
-                'quality_assurance' => (string) ($memoryData['quality_assurance'] ?? ''),
-                'risk_management' => (string) ($memoryData['risk_management'] ?? ''),
-                'compliance_matrix' => (string) ($memoryData['compliance_matrix'] ?? ''),
-                'full_report_markdown' => (string) ($memoryData['full_report_markdown'] ?? ''),
-                'status' => 'generated',
+                'title' => 'Memoria Tecnica - '.$tender->title,
+                'introduction' => null,
+                'company_presentation' => null,
+                'technical_approach' => null,
+                'methodology' => null,
+                'team_structure' => null,
+                'timeline' => null,
+                'timeline_plan' => null,
+                'quality_assurance' => null,
+                'risk_management' => null,
+                'compliance_matrix' => null,
+                'full_report_markdown' => null,
+                'status' => 'draft',
                 'generated_file_path' => null,
-                'generated_at' => now(),
+                'generated_at' => null,
             ]
         );
+
+        foreach (TechnicalMemorySections::fields() as $sectionField) {
+            GenerateTechnicalMemorySection::dispatch(
+                technicalMemoryId: $memory->id,
+                section: $sectionField,
+                pcaData: $pcaData,
+                pptData: $pptData,
+            );
+        }
     }
 }

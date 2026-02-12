@@ -216,6 +216,9 @@
                                 <p class="text-sm font-medium text-sky-900 dark:text-sky-200">Generando memoria técnica</p>
                             </div>
                             <p class="mt-2 text-sm text-sky-800 dark:text-sky-300">La IA está redactando la memoria. La vista se actualizará automáticamente cuando termine.</p>
+                            <a href="{{ route('technical-memories.show', $tender) }}" class="mt-3 inline-flex items-center rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-700">
+                                Ver progreso de la memoria
+                            </a>
                         </div>
                     @elseif($tender->technicalMemory)
                         <div class="rounded-xl border border-green-200 bg-green-50 p-4 dark:border-green-900 dark:bg-green-950/30">
@@ -227,6 +230,15 @@
                             <a href="{{ route('technical-memories.show', $tender) }}" class="mt-3 inline-flex items-center rounded-lg bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700">
                                 Ver Memoria Técnica
                             </a>
+                            <button
+                                wire:click="generateMemory"
+                                wire:loading.attr="disabled"
+                                wire:target="generateMemory"
+                                class="mt-2 inline-flex items-center rounded-lg bg-slate-200 px-3 py-1.5 text-sm font-medium text-slate-800 transition hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600"
+                            >
+                                <span wire:loading.remove wire:target="generateMemory">Regenerar Memoria Técnica</span>
+                                <span wire:loading wire:target="generateMemory">Regenerando...</span>
+                            </button>
                         </div>
                     @elseif($tender->status === 'completed')
                         <div class="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900 dark:bg-emerald-950/30">

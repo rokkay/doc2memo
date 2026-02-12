@@ -114,6 +114,32 @@ it('shows empty state when no memory exists', function (): void {
         ->assertSee(route('tenders.show', $tender));
 });
 
+it('polls and shows section progress while memory generation is in draft', function (): void {
+    $tender = Tender::factory()->create();
+
+    TechnicalMemory::factory()->create([
+        'tender_id' => $tender->id,
+        'title' => 'Memoria Tecnica - '.$tender->title,
+        'status' => 'draft',
+        'generated_at' => null,
+        'introduction' => 'Primer bloque completado.',
+        'company_presentation' => null,
+        'technical_approach' => null,
+        'methodology' => null,
+        'team_structure' => null,
+        'timeline' => null,
+        'quality_assurance' => null,
+        'risk_management' => null,
+        'compliance_matrix' => null,
+    ]);
+
+    Livewire::test(ShowMemory::class, ['tender' => $tender])
+        ->assertSee('Generando memoria tecnica por secciones')
+        ->assertSee('Generacion en curso')
+        ->assertSee('1/9')
+        ->assertSeeHtml('wire:poll.2s.visible="refreshMemory"');
+});
+
 it('renders gantt chart block when timeline has schedulable lines', function (): void {
     $tender = Tender::factory()->create();
 

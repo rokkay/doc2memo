@@ -104,7 +104,39 @@ it('displays technical memory when available', function (): void {
     Livewire::test(TenderDetail::class, ['tender' => $tender])
         ->assertSee('Memoria Técnica Generada')
         ->assertSee('Test Technical Memory')
-        ->assertSee('Ver Memoria Técnica');
+        ->assertSee('Ver Memoria Técnica')
+        ->assertSee('Regenerar Memoria Técnica');
+});
+
+it('can regenerate existing technical memory and reset sections', function (): void {
+    Queue::fake();
+
+    $tender = Tender::factory()->create(['status' => 'completed']);
+    $memory = TechnicalMemory::factory()->create([
+        'tender_id' => $tender->id,
+        'status' => 'generated',
+        'generated_at' => now(),
+        'introduction' => 'Contenido previo',
+        'full_report_markdown' => 'Reporte previo',
+        'generated_file_path' => 'technical-memories/old.pdf',
+    ]);
+
+    Livewire::test(TenderDetail::class, ['tender' => $tender])
+        ->call('generateMemory')
+        ->assertDispatched('memory-generated');
+
+    Queue::assertPushed(GenerateTechnicalMemory::class, function (GenerateTechnicalMemory $job) use ($tender): bool {
+        return $job->tender->is($tender);
+    });
+
+    $memory = $memory->fresh();
+
+    expect($memory)->not->toBeNull();
+    expect($memory?->status)->toBe('draft');
+    expect($memory?->generated_at)->toBeNull();
+    expect($memory?->introduction)->toBeNull();
+    expect($memory?->full_report_markdown)->toBeNull();
+    expect($memory?->generated_file_path)->toBeNull();
 });
 
 it('shows per-document analyze actions and hides general analyze button', function (): void {
@@ -186,7 +218,9 @@ it('queues technical memory generation when analysis is complete', function (): 
 
     Livewire::test(TenderDetail::class, ['tender' => $tender])
         ->call('generateMemory')
-        ->assertDispatched('memory-generated');
+        ->assertDispatched('memory-generated')
+        ->assertSee('Ver progreso de la memoria')
+        ->assertSee(route('technical-memories.show', $tender));
 
     Queue::assertPushed(GenerateTechnicalMemory::class, function (GenerateTechnicalMemory $job) use ($tender): bool {
         return $job->tender->is($tender);

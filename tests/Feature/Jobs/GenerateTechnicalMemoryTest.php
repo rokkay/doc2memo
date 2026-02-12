@@ -2,19 +2,22 @@
 
 declare(strict_types=1);
 
-use App\Ai\Agents\TechnicalMemoryGenerator;
 use App\Jobs\GenerateTechnicalMemory;
+use App\Jobs\GenerateTechnicalMemorySection;
 use App\Models\Document;
 use App\Models\ExtractedCriterion;
 use App\Models\ExtractedSpecification;
 use App\Models\Tender;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 
 use function Pest\Laravel\assertDatabaseHas;
 
 uses(RefreshDatabase::class);
 
-it('generates a technical memory from extracted data', function (): void {
+it('creates draft memory and dispatches one section job per section', function (): void {
+    Queue::fake();
+
     $tender = Tender::factory()->completed()->create([
         'title' => 'Servicio de desarrollo y mantenimiento',
     ]);
@@ -45,61 +48,32 @@ it('generates a technical memory from extracted data', function (): void {
         'requirements' => 'Cumplir WCAG 2.1 AA',
     ]);
 
-    TechnicalMemoryGenerator::fake([
-        [
-            'title' => 'Memoria tecnica para '.$tender->title,
-            'introduction' => 'Introduccion generada por IA.',
-            'company_presentation' => 'Presentacion de la empresa.',
-            'technical_approach' => 'Enfoque tecnico detallado.',
-            'methodology' => 'Metodologia de trabajo iterativa.',
-            'team_structure' => 'Equipo con jefe de proyecto y analistas.',
-            'timeline' => 'Plan de 24 meses con hitos trimestrales.',
-            'timeline_plan' => [
-                'total_weeks' => 24,
-                'tasks' => [
-                    [
-                        'id' => 'analysis',
-                        'title' => 'Analisis inicial',
-                        'lane' => 'Planificacion',
-                        'start_week' => 1,
-                        'end_week' => 4,
-                        'depends_on' => [],
-                    ],
-                    [
-                        'id' => 'implementation',
-                        'title' => 'Ejecucion tecnica',
-                        'lane' => 'Ejecucion',
-                        'start_week' => 5,
-                        'end_week' => 20,
-                        'depends_on' => ['analysis'],
-                    ],
-                ],
-                'milestones' => [
-                    [
-                        'title' => 'Entrega final',
-                        'week' => 24,
-                    ],
-                ],
-            ],
-            'quality_assurance' => 'Plan de calidad y pruebas.',
-            'risk_management' => 'Matriz de riesgos y mitigaciones.',
-            'compliance_matrix' => 'Tabla de cumplimiento criterio-solucion.',
-            'full_report_markdown' => '# Memoria tecnica\n\nContenido completo.',
-        ],
-    ])->preventStrayPrompts();
-
     (new GenerateTechnicalMemory($tender))->handle();
 
     assertDatabaseHas('technical_memories', [
         'tender_id' => $tender->id,
-        'status' => 'generated',
-        'title' => 'Memoria tecnica para '.$tender->title,
+        'status' => 'draft',
+        'title' => 'Memoria Tecnica - '.$tender->title,
     ]);
+
+    Queue::assertPushedTimes(GenerateTechnicalMemorySection::class, 9);
+
+    Queue::assertPushed(GenerateTechnicalMemorySection::class, function (GenerateTechnicalMemorySection $job): bool {
+        return in_array($job->section, [
+            'introduction',
+            'company_presentation',
+            'technical_approach',
+            'methodology',
+            'team_structure',
+            'timeline',
+            'quality_assurance',
+            'risk_management',
+            'compliance_matrix',
+        ], true);
+    });
 
     $memory = $tender->fresh()->technicalMemory;
 
     expect($memory)->not->toBeNull();
-    expect($memory?->timeline_plan)->toBeArray();
-    expect(data_get($memory?->timeline_plan, 'total_weeks'))->toBe(24);
-    expect(data_get($memory?->timeline_plan, 'tasks.0.id'))->toBe('analysis');
+    expect($memory?->generated_at)->toBeNull();
 });

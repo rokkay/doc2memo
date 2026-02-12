@@ -12,7 +12,15 @@ class ShowMemory extends Component
 
     public function mount(Tender $tender): void
     {
-        $this->tender = $tender->load('technicalMemory');
+        $this->tender = $tender;
+
+        $this->refreshMemory();
+    }
+
+    public function refreshMemory(): void
+    {
+        $this->tender->refresh();
+        $this->tender->load('technicalMemory');
     }
 
     public function render(): View
