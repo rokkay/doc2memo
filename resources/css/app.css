@@ -14,6 +14,7 @@
 
 html {
     color-scheme: light;
+    scroll-behavior: smooth;
 }
 
 html.dark {
@@ -32,5 +33,26 @@ html.dark {
     [aria-label='Pagination Navigation'] a,
     [aria-label='Pagination Navigation'] button {
         @apply cursor-pointer;
+    }
+
+    .memory-section {
+        scroll-margin-top: 7rem;
+    }
+
+    .memory-section:target {
+        animation: memory-target-pulse 900ms ease-out;
+        @apply ring-2 ring-cyan-300/80 dark:ring-cyan-700/70;
+    }
+}
+
+@keyframes memory-target-pulse {
+    0% {
+        background-color: color-mix(in srgb, oklch(97.2% 0.014 254.604) 75%, transparent);
+        transform: translateY(-2px);
+    }
+
+    100% {
+        background-color: transparent;
+        transform: translateY(0);
     }
 }
