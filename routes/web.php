@@ -28,3 +28,6 @@ Route::get('tenders/{tender}/technical-memory', [TechnicalMemoryController::clas
 
 Route::get('technical-memories/{technicalMemory}/download', [TechnicalMemoryController::class, 'download'])
     ->name('technical-memories.download');
+
+Route::get('technical-memories/{technicalMemory}/download-markdown', [TechnicalMemoryController::class, 'downloadMarkdown'])
+    ->name('technical-memories.download-markdown');

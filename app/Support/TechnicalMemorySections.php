@@ -80,4 +80,28 @@ class TechnicalMemorySections
             ->filter(fn (string $field): bool => filled($memory->{$field}))
             ->count();
     }
+
+    public static function buildMarkdownDocument(TechnicalMemory $memory): string
+    {
+        $title = trim((string) ($memory->title ?: 'Memoria Técnica'));
+
+        $sections = collect(self::fields())
+            ->map(function (string $field) use ($memory): ?string {
+                $content = trim((string) ($memory->{$field} ?? ''));
+
+                if ($content === '') {
+                    return null;
+                }
+
+                return '## '.self::title($field)."\n\n{$content}";
+            })
+            ->filter()
+            ->values()
+            ->all();
+
+        $markdown = collect(array_merge(["# {$title}"], $sections))
+            ->implode("\n\n");
+
+        return trim($markdown)."\n";
+    }
 }

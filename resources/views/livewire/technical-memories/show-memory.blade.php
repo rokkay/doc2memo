@@ -80,6 +80,8 @@
             $criteriaMatrixRows = $allCriteriaMatrixRows
                 ->when($this->criteriaPriorityFilter !== 'all', fn ($rows) => $rows->where('priority', $this->criteriaPriorityFilter))
                 ->values();
+
+            $markdownExport = \App\Support\TechnicalMemorySections::buildMarkdownDocument($memory);
         @endphp
 
         <div class="space-y-6">
@@ -111,12 +113,37 @@
                         @endif
                     </div>
 
-                    <div class="flex flex-wrap items-center gap-2">
-                        <a href="{{ route('tenders.show', $tender) }}" class="inline-flex items-center rounded-lg bg-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600">
+                    <div class="flex flex-wrap items-center gap-2" x-data="{ copied: false, copyMarkdown() { navigator.clipboard.writeText(this.$refs.markdown.value).then(() => { this.copied = true; setTimeout(() => this.copied = false, 1500); }); } }">
+                        <textarea x-ref="markdown" class="hidden">{{ $markdownExport }}</textarea>
+                        <a href="{{ route('tenders.show', $tender) }}" class="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600">
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 18l-6-6 6-6" />
+                            </svg>
                             Volver
                         </a>
+                        <button type="button" @click="copyMarkdown" class="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-200 dark:hover:bg-emerald-900/60">
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                <rect x="9" y="9" width="10" height="10" rx="2" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M7 15H6a2 2 0 01-2-2V6a2 2 0 012-2h7a2 2 0 012 2v1" />
+                            </svg>
+                            <span x-show="! copied">Copiar Markdown</span>
+                            <span x-show="copied" x-cloak>Copiado</span>
+                        </button>
+                        <a href="{{ route('technical-memories.download-markdown', $memory) }}" class="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700">
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v10" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M8 10l4 4 4-4" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 20h16" />
+                            </svg>
+                            Descargar Markdown
+                        </a>
                         @if($memory->generated_file_path)
-                            <a href="{{ route('technical-memories.download', $memory) }}" class="inline-flex items-center rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700">
+                            <a href="{{ route('technical-memories.download', $memory) }}" class="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700">
+                                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v10" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 10l4 4 4-4" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 20h16" />
+                                </svg>
                                 Descargar PDF
                             </a>
                         @endif

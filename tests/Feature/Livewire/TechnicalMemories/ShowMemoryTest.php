@@ -72,7 +72,6 @@ it('renders section content as markdown html', function (): void {
 
     Livewire::test(ShowMemory::class, ['tender' => $tender])
         ->assertSee('Este bloque usa')
-        ->assertDontSee('**negrita**')
         ->assertSeeHtml('<strong>negrita</strong>')
         ->assertSeeHtml('<li>Punto A</li>')
         ->assertSeeHtml('<li>Punto B</li>');
@@ -106,13 +105,16 @@ it('displays generation date', function (): void {
 
 it('has back link', function (): void {
     $tender = Tender::factory()->create();
-    TechnicalMemory::factory()->create([
+    $memory = TechnicalMemory::factory()->create([
         'tender_id' => $tender->id,
     ]);
 
     Livewire::test(ShowMemory::class, ['tender' => $tender])
         ->assertSee('Volver')
-        ->assertSee(route('tenders.show', $tender));
+        ->assertSee('Copiar Markdown')
+        ->assertSee('Descargar Markdown')
+        ->assertSee(route('tenders.show', $tender))
+        ->assertSee(route('technical-memories.download-markdown', $memory));
 });
 
 it('shows download button when file path exists', function (): void {
