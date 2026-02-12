@@ -98,6 +98,7 @@ it('displays technical memory when available', function (): void {
     TechnicalMemory::factory()->create([
         'tender_id' => $tender->id,
         'title' => 'Test Technical Memory',
+        'status' => 'generated',
     ]);
 
     Livewire::test(TenderDetail::class, ['tender' => $tender])
@@ -172,7 +173,7 @@ it('renders styled document action buttons for download and retry', function ():
     ]);
 
     Livewire::test(TenderDetail::class, ['tender' => $tender])
-        ->assertSeeHtml('inline-flex items-center justify-center rounded-md')
+        ->assertSeeHtml('inline-flex items-center justify-center rounded-lg')
         ->assertSeeHtml('bg-sky-100')
         ->assertSeeHtml('text-sky-800')
         ->assertSeeHtml('bg-red-100')

@@ -1,133 +1,119 @@
 <div class="space-y-6">
-    <div class="rounded-2xl border border-slate-200 bg-white/95 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
-        <div class="px-4 py-5 sm:p-6">
-            <div class="flex justify-between items-start mb-6">
+    <section class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div class="bg-gradient-to-r from-sky-100 via-cyan-50 to-white px-4 py-6 sm:px-6 dark:from-sky-950/40 dark:via-slate-900 dark:to-slate-900">
+            <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div>
-                    <h1 class="text-2xl font-bold text-gray-900 dark:text-slate-100">{{ $document->original_filename }}</h1>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-slate-400">{{ $this->documentTypeLabel }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">Detalle de Documento</p>
+                    <h1 class="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">{{ $document->original_filename }}</h1>
+                    <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">{{ $this->documentTypeLabel }}</p>
                 </div>
 
-                <div class="flex space-x-3">
-                    <a href="{{ route('tenders.show', $document->tender) }}" class="bg-slate-200 text-slate-700 px-4 py-2 rounded-md hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600">
+                <div class="flex flex-wrap items-center gap-2">
+                    <a href="{{ route('tenders.show', $document->tender) }}" class="inline-flex items-center rounded-lg bg-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600">
                         Volver
                     </a>
-                    <a href="{{ route('documents.download', $document) }}" class="bg-sky-600 text-white px-4 py-2 rounded-md hover:bg-sky-700">
+                    <a href="{{ route('documents.download', $document) }}" class="inline-flex items-center rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700">
                         Descargar
                     </a>
                 </div>
             </div>
+        </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div>
-                    <h2 class="text-lg font-medium text-gray-900 mb-3 dark:text-slate-100">Informacion del documento</h2>
-                    <dl class="space-y-2">
-                        <div class="flex justify-between">
-                            <dt class="text-sm font-medium text-gray-500">Tipo:</dt>
-                            <dd class="text-sm text-gray-900">{{ $this->documentTypeLabel }}</dd>
-                        </div>
-                        <div class="flex justify-between">
-                            <dt class="text-sm font-medium text-gray-500">Tamano:</dt>
-                            <dd class="text-sm text-gray-900">{{ number_format($document->file_size / 1024, 2) }} KB</dd>
-                        </div>
-                        <div class="flex justify-between">
-                            <dt class="text-sm font-medium text-gray-500">Estado:</dt>
-                            <dd>
-                                <x-ui.badge :variant="$this->statusVariant">
-                                    {{ $this->statusLabel }}
-                                </x-ui.badge>
-                            </dd>
-                        </div>
-                        @if($document->analyzed_at)
-                            <div class="flex justify-between">
-                                <dt class="text-sm font-medium text-gray-500">Analizado:</dt>
-                                <dd class="text-sm text-gray-900">{{ $document->analyzed_at->format('d/m/Y H:i') }}</dd>
-                            </div>
-                        @endif
-                    </dl>
+        <div class="grid grid-cols-1 gap-4 border-t border-slate-200 px-4 py-4 sm:grid-cols-2 lg:grid-cols-4 sm:px-6 dark:border-slate-800">
+            <div class="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/70">
+                <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Tipo</p>
+                <p class="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{{ $this->documentTypeLabel }}</p>
+            </div>
+            <div class="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/70">
+                <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Tamano</p>
+                <p class="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{{ number_format($document->file_size / 1024, 2) }} KB</p>
+            </div>
+            <div class="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/70">
+                <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Estado</p>
+                <div class="mt-1">
+                    <x-ui.badge :variant="$this->statusVariant">{{ $this->statusLabel }}</x-ui.badge>
                 </div>
-
-                @if($document->extracted_text)
-                    <div class="lg:col-span-2">
-                        <h2 class="text-lg font-medium text-gray-900 mb-3 dark:text-slate-100">Texto extraido</h2>
-                        <div class="bg-gray-50 rounded-md p-4 max-h-96 overflow-y-auto dark:bg-slate-800">
-                            <pre class="text-sm text-gray-700 whitespace-pre-wrap dark:text-slate-200">{{ $document->extracted_text }}</pre>
-                        </div>
-                    </div>
-                @endif
+            </div>
+            <div class="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/70">
+                <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Analizado</p>
+                <p class="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{{ $document->analyzed_at?->format('d/m/Y H:i') ?? 'Pendiente' }}</p>
             </div>
         </div>
-    </div>
+    </section>
+
+    @if($document->extracted_text)
+        <section class="rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div class="border-b border-slate-200 px-4 py-4 sm:px-6 dark:border-slate-800">
+                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Texto extraido</h2>
+            </div>
+            <div class="max-h-[28rem] overflow-y-auto bg-slate-50 p-4 sm:p-6 dark:bg-slate-800/60">
+                <pre class="whitespace-pre-wrap text-sm leading-6 text-slate-700 dark:text-slate-200">{{ $document->extracted_text }}</pre>
+            </div>
+        </section>
+    @endif
 
     @if($document->document_type === 'pca' && $document->extractedCriteria->isNotEmpty())
-        <div class="rounded-2xl border border-slate-200 bg-white/95 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
-            <div class="px-4 py-5 sm:p-6">
-                <h2 class="text-lg font-medium text-gray-900 mb-4 dark:text-slate-100">
-                    Criterios extraidos (PCA)
-                    <span class="ml-2 text-sm text-gray-500">({{ $document->extractedCriteria->count() }} criterios)</span>
-                </h2>
-
-                <div class="space-y-3 max-h-96 overflow-y-auto">
-                    @foreach($document->extractedCriteria as $criterion)
-                        <div class="border rounded-lg p-4" wire:key="criterion-{{ $criterion->id }}">
-                            <div class="flex justify-between items-start">
-                                <h3 class="text-sm font-medium text-gray-900">
-                                    @if($criterion->section_number)
-                                        {{ $criterion->section_number }} -
-                                    @endif
-                                    {{ $criterion->section_title }}
-                                </h3>
-
-                                @php
-                                    $variant = match($criterion->priority) {
-                                        'mandatory' => 'error',
-                                        'preferable' => 'warning',
-                                        default => 'success',
-                                    };
-                                @endphp
-
-                                <x-ui.badge :variant="$variant">
-                                    {{ ucfirst($criterion->priority) }}
-                                </x-ui.badge>
-                            </div>
-
-                            <p class="mt-2 text-sm text-gray-600">{{ $criterion->description }}</p>
-                        </div>
-                    @endforeach
-                </div>
+        <section class="rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div class="border-b border-slate-200 px-4 py-4 sm:px-6 dark:border-slate-800">
+                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Criterios extraidos (PCA)</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400">{{ $document->extractedCriteria->count() }} criterios</p>
             </div>
-        </div>
+
+            <div class="max-h-[30rem] space-y-3 overflow-y-auto px-4 py-4 sm:px-6">
+                @foreach($document->extractedCriteria as $criterion)
+                    @php
+                        $variant = match($criterion->priority) {
+                            'mandatory' => 'error',
+                            'preferable' => 'warning',
+                            default => 'success',
+                        };
+                    @endphp
+
+                    <article class="rounded-2xl border border-slate-200 p-4 dark:border-slate-700" wire:key="criterion-{{ $criterion->id }}">
+                        <div class="flex items-start justify-between gap-3">
+                            <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                @if($criterion->section_number)
+                                    {{ $criterion->section_number }} -
+                                @endif
+                                {{ $criterion->section_title }}
+                            </h3>
+                            <x-ui.badge :variant="$variant">{{ ucfirst($criterion->priority) }}</x-ui.badge>
+                        </div>
+                        <p class="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{{ $criterion->description }}</p>
+                    </article>
+                @endforeach
+            </div>
+        </section>
     @endif
 
     @if($document->document_type === 'ppt' && $document->extractedSpecifications->isNotEmpty())
-        <div class="rounded-2xl border border-slate-200 bg-white/95 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
-            <div class="px-4 py-5 sm:p-6">
-                <h2 class="text-lg font-medium text-gray-900 mb-4 dark:text-slate-100">
-                    Especificaciones extraidas (PPT)
-                    <span class="ml-2 text-sm text-gray-500">({{ $document->extractedSpecifications->count() }} especificaciones)</span>
-                </h2>
-
-                <div class="space-y-3 max-h-96 overflow-y-auto">
-                    @foreach($document->extractedSpecifications as $spec)
-                        <div class="border rounded-lg p-4" wire:key="spec-{{ $spec->id }}">
-                            <h3 class="text-sm font-medium text-gray-900">
-                                @if($spec->section_number)
-                                    {{ $spec->section_number }} -
-                                @endif
-                                {{ $spec->section_title }}
-                            </h3>
-
-                            <p class="mt-2 text-sm text-gray-600">{{ $spec->technical_description }}</p>
-
-                            @if($spec->requirements)
-                                <div class="mt-2">
-                                    <span class="text-xs font-medium text-gray-500">Requisitos:</span>
-                                    <p class="text-sm text-gray-600">{{ $spec->requirements }}</p>
-                                </div>
-                            @endif
-                        </div>
-                    @endforeach
-                </div>
+        <section class="rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div class="border-b border-slate-200 px-4 py-4 sm:px-6 dark:border-slate-800">
+                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Especificaciones extraidas (PPT)</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400">{{ $document->extractedSpecifications->count() }} especificaciones</p>
             </div>
-        </div>
+
+            <div class="max-h-[30rem] space-y-3 overflow-y-auto px-4 py-4 sm:px-6">
+                @foreach($document->extractedSpecifications as $spec)
+                    <article class="rounded-2xl border border-slate-200 p-4 dark:border-slate-700" wire:key="spec-{{ $spec->id }}">
+                        <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                            @if($spec->section_number)
+                                {{ $spec->section_number }} -
+                            @endif
+                            {{ $spec->section_title }}
+                        </h3>
+
+                        <p class="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{{ $spec->technical_description }}</p>
+
+                        @if($spec->requirements)
+                            <div class="mt-3 rounded-lg bg-slate-50 p-3 dark:bg-slate-800/70">
+                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Requisitos</p>
+                                <p class="mt-1 text-sm text-slate-700 dark:text-slate-200">{{ $spec->requirements }}</p>
+                            </div>
+                        @endif
+                    </article>
+                @endforeach
+            </div>
+        </section>
     @endif
 </div>
