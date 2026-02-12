@@ -10,27 +10,27 @@
     "license": "MIT",
     "require": {
         "php": "^8.4.0",
-        "laravel/ai": "*",
-        "laravel/framework": "^12.0",
-        "laravel/tinker": "^2.10.1",
-        "livewire/livewire": "^4.1",
-        "nunomaduro/essentials": "^1.0",
-        "smalot/pdfparser": "^2.12"
+        "laravel/ai": ">=0.1.3",
+        "laravel/framework": "^12.51",
+        "laravel/tinker": "^2.11.1",
+        "livewire/livewire": "^4.1.4",
+        "nunomaduro/essentials": "^1.0.1",
+        "smalot/pdfparser": "^2.12.3"
     },
     "require-dev": {
-        "driftingly/rector-laravel": "^2.1",
-        "fakerphp/faker": "^1.23",
-        "larastan/larastan": "^3.0",
-        "laravel/boost": "^2.0",
-        "laravel/pail": "^1.2.2",
-        "laravel/pint": "^1.24",
-        "laravel/sail": "^1.41",
-        "mockery/mockery": "^1.6",
-        "nunomaduro/collision": "^8.6",
-        "pestphp/pest": "^4.3",
+        "driftingly/rector-laravel": "^2.1.2",
+        "fakerphp/faker": "^1.24.1",
+        "larastan/larastan": "^3.9.2",
+        "laravel/boost": "^2.1.2",
+        "laravel/pail": "^1.2.6",
+        "laravel/pint": "^1.27",
+        "laravel/sail": "^1.53",
+        "mockery/mockery": "^1.6.12",
+        "nunomaduro/collision": "^8.8.3",
+        "pestphp/pest": "^4.3.2",
         "pestphp/pest-plugin-laravel": "^4.0",
-        "pestphp/pest-plugin-type-coverage": "^4.0",
-        "rector/rector": "^2.3"
+        "pestphp/pest-plugin-type-coverage": "^4.0.3",
+        "rector/rector": "^2.3.6"
     },
     "autoload": {
         "psr-4": {
@@ -57,10 +57,6 @@
             "Composer\\Config::disableProcessTimeout",
             "npx concurrently -c \"#93c5fd,#c4b5fd,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=1\" \"npm run dev\" --names='server,queue,vite'"
         ],
-        "test": [
-            "@php artisan config:clear --ansi",
-            "@php artisan test"
-        ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan package:discover --ansi"
@@ -79,6 +75,27 @@
         ],
         "pre-package-uninstall": [
             "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
+        ],
+        "update:requirements": [
+            "composer bump",
+            "npx npm-check-updates -u"
+        ],
+        "lint": [
+            "rector",
+            "pint --parallel"
+        ],
+        "test:type-coverage": "pest --type-coverage --min=100 --memory-limit=2G",
+        "test:lint": [
+            "pint --parallel --test",
+            "rector --dry-run"
+        ],
+        "test:types": [
+            "phpstan"
+        ],
+        "test": [
+            "@test:type-coverage",
+            "@test:lint",
+            "@test:types"
         ]
     },
     "extra": {
