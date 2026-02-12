@@ -34,37 +34,6 @@
             $totalCharacters = (int) $sections->sum(fn (array $section): int => mb_strlen((string) $section['content']));
             $estimatedReadingMinutes = max(1, (int) ceil($totalCharacters / 1100));
 
-            $buildInsight = function (?string $content): ?string {
-                if (! filled($content)) {
-                    return null;
-                }
-
-                $firstParagraph = collect(preg_split('/\n\s*\n/u', trim((string) $content)) ?: [])->first();
-
-                if (! is_string($firstParagraph) || trim($firstParagraph) === '') {
-                    return null;
-                }
-
-                $normalized = preg_replace('/\s+/u', ' ', trim($firstParagraph)) ?? trim($firstParagraph);
-
-                if ($normalized === '') {
-                    return null;
-                }
-
-                if (mb_strlen($normalized) <= 170) {
-                    return $normalized;
-                }
-
-                return rtrim(mb_substr($normalized, 0, 170)).'...';
-            };
-
-            $executiveInsights = collect([
-                $buildInsight($memory->introduction),
-                $buildInsight($memory->technical_approach),
-                $buildInsight($memory->methodology),
-                $buildInsight($memory->compliance_matrix),
-            ])->filter()->take(4)->values();
-
             $timelinePlan = is_array($memory->timeline_plan ?? null)
                 ? $memory->timeline_plan
                 : [];
@@ -193,16 +162,6 @@
                 </div>
             </div>
 
-            @if($executiveInsights->isNotEmpty())
-                <div class="px-4 py-4 sm:px-6">
-                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Puntos clave</p>
-                    <ul class="mt-2 space-y-2 text-sm text-slate-700 dark:text-slate-200">
-                        @foreach($executiveInsights as $insight)
-                            <li class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/60">{{ $insight }}</li>
-                        @endforeach
-                    </ul>
-                </div>
-            @endif
         </section>
 
         <section class="grid grid-cols-1 gap-6 xl:grid-cols-12" x-data="{ expandAllDetails() { this.$root.querySelectorAll('[data-section-detail]').forEach((el) => { el.open = true }) }, collapseAllDetails() { this.$root.querySelectorAll('[data-section-detail]').forEach((el) => { el.open = false }) } }">
