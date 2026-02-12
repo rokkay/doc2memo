@@ -12,7 +12,7 @@
     <div class="pointer-events-none fixed inset-x-0 top-0 -z-10 h-72 bg-gradient-to-b from-sky-100 via-cyan-50 to-transparent dark:from-slate-900 dark:via-slate-900/40 dark:to-transparent"></div>
 
     <header class="sticky top-0 z-30 border-b border-slate-200/80 bg-white/85 backdrop-blur dark:border-slate-800 dark:bg-slate-900/85">
-        <nav class="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        <nav class="mx-auto flex h-16 w-full max-w-[90rem] items-center justify-between px-4 sm:px-6 lg:px-8 2xl:max-w-none 2xl:px-10">
             <a href="{{ route('tenders.index') }}" class="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-sm font-semibold text-sky-700 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-300">
                 <span class="inline-flex h-2 w-2 rounded-full bg-sky-500"></span>
                 Doc2Memo
@@ -45,7 +45,7 @@
         </nav>
     </header>
 
-    <main class="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8">
+    <main class="mx-auto w-full max-w-[90rem] flex-1 px-4 py-6 sm:px-6 lg:px-8 2xl:max-w-none 2xl:px-10">
         {{-- Flash Messages --}}
         @if(session('success'))
             <x-ui.alert type="success" :message="session('success')" />
@@ -67,7 +67,7 @@
     </main>
 
     <footer class="mt-auto border-t border-slate-200 bg-white/85 dark:border-slate-800 dark:bg-slate-900/90">
-        <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div class="mx-auto max-w-[90rem] px-4 py-6 sm:px-6 lg:px-8 2xl:max-w-none 2xl:px-10">
             <p class="text-center text-sm text-slate-500 dark:text-slate-400">
                 Doc2Memo - Generador de Memorias Técnicas con IA
             </p>

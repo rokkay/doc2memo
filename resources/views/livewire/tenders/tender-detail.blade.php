@@ -254,75 +254,79 @@
         </div>
     </section>
 
-    @if($tender->extractedCriteria->isNotEmpty())
-        <section class="rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div class="border-b border-slate-200 px-4 py-4 sm:px-6 dark:border-slate-800">
-                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Criterios Extraídos (PCA)</h2>
-                <p class="text-sm text-slate-500 dark:text-slate-400">{{ $tender->extractedCriteria->count() }} criterios identificados</p>
-            </div>
+    @if($tender->extractedCriteria->isNotEmpty() || $tender->extractedSpecifications->isNotEmpty())
+        <section class="grid grid-cols-1 gap-6 2xl:grid-cols-2">
+            @if($tender->extractedCriteria->isNotEmpty())
+                <section class="rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <div class="border-b border-slate-200 px-4 py-4 sm:px-6 dark:border-slate-800">
+                        <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Criterios Extraídos (PCA)</h2>
+                        <p class="text-sm text-slate-500 dark:text-slate-400">{{ $tender->extractedCriteria->count() }} criterios identificados</p>
+                    </div>
 
-            <div class="max-h-[30rem] space-y-3 overflow-y-auto px-4 py-4 sm:px-6">
-                @foreach($tender->extractedCriteria as $criterion)
-                    @php
-                        $priorityVariant = match($criterion->priority) {
-                            'mandatory' => 'error',
-                            'preferable' => 'warning',
-                            'optional' => 'success',
-                            default => 'default',
-                        };
-                    @endphp
+                    <div class="max-h-[24rem] space-y-2 overflow-y-auto px-4 py-4 sm:px-6">
+                        @foreach($tender->extractedCriteria as $criterion)
+                            @php
+                                $priorityVariant = match($criterion->priority) {
+                                    'mandatory' => 'error',
+                                    'preferable' => 'warning',
+                                    'optional' => 'success',
+                                    default => 'default',
+                                };
+                            @endphp
 
-                    <article class="rounded-2xl border border-slate-200 p-4 dark:border-slate-700" wire:key="criterion-{{ $criterion->id }}">
-                        <div class="flex items-start justify-between gap-3">
-                            <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                                @if($criterion->section_number)
-                                    {{ $criterion->section_number }} -
+                            <article class="rounded-xl border border-slate-200 p-3 dark:border-slate-700" wire:key="criterion-{{ $criterion->id }}">
+                                <div class="flex items-start justify-between gap-3">
+                                    <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                        @if($criterion->section_number)
+                                            {{ $criterion->section_number }} -
+                                        @endif
+                                        {{ $criterion->section_title }}
+                                    </h3>
+                                    <x-ui.badge :variant="$priorityVariant">{{ ucfirst($criterion->priority) }}</x-ui.badge>
+                                </div>
+                                <p class="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{{ $criterion->description }}</p>
+                            </article>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
+
+            @if($tender->extractedSpecifications->isNotEmpty())
+                <section class="rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <div class="border-b border-slate-200 px-4 py-4 sm:px-6 dark:border-slate-800">
+                        <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Especificaciones Técnicas Extraídas (PPT)</h2>
+                        <p class="text-sm text-slate-500 dark:text-slate-400">{{ $tender->extractedSpecifications->count() }} especificaciones identificadas</p>
+                    </div>
+
+                    <div class="max-h-[24rem] space-y-2 overflow-y-auto px-4 py-4 sm:px-6">
+                        @foreach($tender->extractedSpecifications as $spec)
+                            <article class="rounded-xl border border-slate-200 p-3 dark:border-slate-700" wire:key="spec-{{ $spec->id }}">
+                                <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                    @if($spec->section_number)
+                                        {{ $spec->section_number }} -
+                                    @endif
+                                    {{ $spec->section_title }}
+                                </h3>
+                                <p class="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{{ $spec->technical_description }}</p>
+
+                                @if($spec->requirements)
+                                    <div class="mt-3 rounded-lg bg-slate-50 p-3 dark:bg-slate-800/70">
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Requisitos</p>
+                                        <p class="mt-1 text-sm text-slate-700 dark:text-slate-200">{{ $spec->requirements }}</p>
+                                    </div>
                                 @endif
-                                {{ $criterion->section_title }}
-                            </h3>
-                            <x-ui.badge :variant="$priorityVariant">{{ ucfirst($criterion->priority) }}</x-ui.badge>
-                        </div>
-                        <p class="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{{ $criterion->description }}</p>
-                    </article>
-                @endforeach
-            </div>
-        </section>
-    @endif
 
-    @if($tender->extractedSpecifications->isNotEmpty())
-        <section class="rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div class="border-b border-slate-200 px-4 py-4 sm:px-6 dark:border-slate-800">
-                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Especificaciones Técnicas Extraídas (PPT)</h2>
-                <p class="text-sm text-slate-500 dark:text-slate-400">{{ $tender->extractedSpecifications->count() }} especificaciones identificadas</p>
-            </div>
-
-            <div class="max-h-[30rem] space-y-3 overflow-y-auto px-4 py-4 sm:px-6">
-                @foreach($tender->extractedSpecifications as $spec)
-                    <article class="rounded-2xl border border-slate-200 p-4 dark:border-slate-700" wire:key="spec-{{ $spec->id }}">
-                        <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                            @if($spec->section_number)
-                                {{ $spec->section_number }} -
-                            @endif
-                            {{ $spec->section_title }}
-                        </h3>
-                        <p class="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{{ $spec->technical_description }}</p>
-
-                        @if($spec->requirements)
-                            <div class="mt-3 rounded-lg bg-slate-50 p-3 dark:bg-slate-800/70">
-                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Requisitos</p>
-                                <p class="mt-1 text-sm text-slate-700 dark:text-slate-200">{{ $spec->requirements }}</p>
-                            </div>
-                        @endif
-
-                        @if($spec->deliverables)
-                            <div class="mt-3 rounded-lg bg-slate-50 p-3 dark:bg-slate-800/70">
-                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Entregables</p>
-                                <p class="mt-1 text-sm text-slate-700 dark:text-slate-200">{{ $spec->deliverables }}</p>
-                            </div>
-                        @endif
-                    </article>
-                @endforeach
-            </div>
+                                @if($spec->deliverables)
+                                    <div class="mt-3 rounded-lg bg-slate-50 p-3 dark:bg-slate-800/70">
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Entregables</p>
+                                        <p class="mt-1 text-sm text-slate-700 dark:text-slate-200">{{ $spec->deliverables }}</p>
+                                    </div>
+                                @endif
+                            </article>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
         </section>
     @endif
 </div>

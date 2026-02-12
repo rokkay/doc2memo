@@ -59,7 +59,7 @@
                 <p class="text-sm text-slate-500 dark:text-slate-400">{{ $document->extractedCriteria->count() }} criterios</p>
             </div>
 
-            <div class="max-h-[30rem] space-y-3 overflow-y-auto px-4 py-4 sm:px-6">
+            <div class="max-h-[24rem] space-y-2 overflow-y-auto px-4 py-4 sm:px-6">
                 @foreach($document->extractedCriteria as $criterion)
                     @php
                         $variant = match($criterion->priority) {
@@ -69,7 +69,7 @@
                         };
                     @endphp
 
-                    <article class="rounded-2xl border border-slate-200 p-4 dark:border-slate-700" wire:key="criterion-{{ $criterion->id }}">
+                    <article class="rounded-xl border border-slate-200 p-3 dark:border-slate-700" wire:key="criterion-{{ $criterion->id }}">
                         <div class="flex items-start justify-between gap-3">
                             <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">
                                 @if($criterion->section_number)
@@ -79,7 +79,7 @@
                             </h3>
                             <x-ui.badge :variant="$variant">{{ ucfirst($criterion->priority) }}</x-ui.badge>
                         </div>
-                        <p class="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{{ $criterion->description }}</p>
+                        <p class="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{{ $criterion->description }}</p>
                     </article>
                 @endforeach
             </div>
@@ -93,9 +93,9 @@
                 <p class="text-sm text-slate-500 dark:text-slate-400">{{ $document->extractedSpecifications->count() }} especificaciones</p>
             </div>
 
-            <div class="max-h-[30rem] space-y-3 overflow-y-auto px-4 py-4 sm:px-6">
+            <div class="max-h-[24rem] space-y-2 overflow-y-auto px-4 py-4 sm:px-6">
                 @foreach($document->extractedSpecifications as $spec)
-                    <article class="rounded-2xl border border-slate-200 p-4 dark:border-slate-700" wire:key="spec-{{ $spec->id }}">
+                    <article class="rounded-xl border border-slate-200 p-3 dark:border-slate-700" wire:key="spec-{{ $spec->id }}">
                         <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">
                             @if($spec->section_number)
                                 {{ $spec->section_number }} -
@@ -103,7 +103,7 @@
                             {{ $spec->section_title }}
                         </h3>
 
-                        <p class="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{{ $spec->technical_description }}</p>
+                        <p class="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{{ $spec->technical_description }}</p>
 
                         @if($spec->requirements)
                             <div class="mt-3 rounded-lg bg-slate-50 p-3 dark:bg-slate-800/70">
