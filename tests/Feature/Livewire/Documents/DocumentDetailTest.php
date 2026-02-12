@@ -71,7 +71,7 @@ it('displays extracted criteria for pca documents', function (): void {
         ->assertSee('Capacidad tecnica')
         ->assertSee('Debe aportar experiencia en proyectos similares.')
         ->assertSeeHtml('xl:grid-cols-2')
-        ->assertSee('Mandatory');
+        ->assertSee('Obligatorio');
 });
 
 it('displays extracted specifications for ppt documents', function (): void {

@@ -30,6 +30,87 @@
                 ['id' => 'riesgos', 'title' => '8. Gestion de Riesgos', 'content' => $memory->risk_management],
                 ['id' => 'cumplimiento', 'title' => '9. Matriz de Cumplimiento', 'content' => $memory->compliance_matrix],
             ])->filter(fn (array $section): bool => filled($section['content']))->values();
+
+            $totalCharacters = (int) $sections->sum(fn (array $section): int => mb_strlen((string) $section['content']));
+            $estimatedReadingMinutes = max(1, (int) ceil($totalCharacters / 1100));
+
+            $buildInsight = function (?string $content): ?string {
+                if (! filled($content)) {
+                    return null;
+                }
+
+                $firstParagraph = collect(preg_split('/\n\s*\n/u', trim((string) $content)) ?: [])->first();
+
+                if (! is_string($firstParagraph) || trim($firstParagraph) === '') {
+                    return null;
+                }
+
+                $normalized = preg_replace('/\s+/u', ' ', trim($firstParagraph)) ?? trim($firstParagraph);
+
+                if ($normalized === '') {
+                    return null;
+                }
+
+                if (mb_strlen($normalized) <= 170) {
+                    return $normalized;
+                }
+
+                return rtrim(mb_substr($normalized, 0, 170)).'...';
+            };
+
+            $executiveInsights = collect([
+                $buildInsight($memory->introduction),
+                $buildInsight($memory->technical_approach),
+                $buildInsight($memory->methodology),
+                $buildInsight($memory->compliance_matrix),
+            ])->filter()->take(4)->values();
+
+            $timelinePlan = is_array($memory->timeline_plan ?? null)
+                ? $memory->timeline_plan
+                : [];
+
+            $timelineTasksCount = count($timelinePlan['tasks'] ?? []);
+            $timelineMilestonesCount = count($timelinePlan['milestones'] ?? []);
+
+            $criteriaCount = $tender->extractedCriteria->count();
+            $specificationsCount = $tender->extractedSpecifications->count();
+
+            $allCriteriaMatrixRows = $tender->extractedCriteria
+                ->map(function ($criterion): array {
+                    $description = trim((string) $criterion->description);
+                    $fragments = collect(preg_split('/\n+|\s*;\s*/u', $description) ?: [])
+                        ->map(function (string $fragment): string {
+                            $fragment = trim($fragment);
+                            $fragment = preg_replace('/^[-*]\s+/', '', $fragment) ?? $fragment;
+                            $fragment = preg_replace('/^\d+[\)\.-]?\s+/', '', $fragment) ?? $fragment;
+
+                            return trim($fragment);
+                        })
+                        ->filter(fn (string $fragment): bool => $fragment !== '')
+                        ->values();
+
+                    if ($fragments->isEmpty()) {
+                        $fragments = collect([$description]);
+                    }
+
+                    return [
+                        'section' => trim((string) ($criterion->section_number ? $criterion->section_number.' - '.$criterion->section_title : $criterion->section_title)),
+                        'priority' => (string) $criterion->priority,
+                        'points' => $fragments->take(2)->values()->all(),
+                        'priority_order' => match ((string) $criterion->priority) {
+                            'mandatory' => 1,
+                            'preferable' => 2,
+                            default => 3,
+                        },
+                    ];
+                })
+                ->filter(fn (array $row): bool => $row['section'] !== '')
+                ->sortBy('priority_order')
+                ->values();
+
+            $criteriaMatrixRows = $allCriteriaMatrixRows
+                ->when($this->criteriaPriorityFilter !== 'all', fn ($rows) => $rows->where('priority', $this->criteriaPriorityFilter))
+                ->values();
         @endphp
 
         <div class="space-y-6">
@@ -87,10 +168,55 @@
             </div>
         </section>
 
-        <section class="grid grid-cols-1 gap-6 xl:grid-cols-12">
+        <section class="rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div class="border-b border-slate-200 px-4 py-4 sm:px-6 dark:border-slate-800">
+                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Resumen ejecutivo</h2>
+                <p class="text-sm text-slate-600 dark:text-slate-300">Vista rapida para revisar alcance, esfuerzo y criterios antes de entrar al detalle.</p>
+            </div>
+
+            <div class="grid grid-cols-1 gap-3 border-b border-slate-200 px-4 py-4 sm:grid-cols-2 xl:grid-cols-4 sm:px-6 dark:border-slate-800">
+                <div class="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/70">
+                    <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Tiempo estimado lectura</p>
+                    <p class="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{{ $estimatedReadingMinutes }} min</p>
+                </div>
+                <div class="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/70">
+                    <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Criterios de evaluacion</p>
+                    <p class="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{{ $criteriaCount }}</p>
+                </div>
+                <div class="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/70">
+                    <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Especificaciones tecnicas</p>
+                    <p class="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{{ $specificationsCount }}</p>
+                </div>
+                <div class="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/70">
+                    <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Cronograma estructurado</p>
+                    <p class="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{{ $timelineTasksCount }} tareas / {{ $timelineMilestonesCount }} hitos</p>
+                </div>
+            </div>
+
+            @if($executiveInsights->isNotEmpty())
+                <div class="px-4 py-4 sm:px-6">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Puntos clave</p>
+                    <ul class="mt-2 space-y-2 text-sm text-slate-700 dark:text-slate-200">
+                        @foreach($executiveInsights as $insight)
+                            <li class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/60">{{ $insight }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+        </section>
+
+        <section class="grid grid-cols-1 gap-6 xl:grid-cols-12" x-data="{ expandAllDetails() { this.$root.querySelectorAll('[data-section-detail]').forEach((el) => { el.open = true }) }, collapseAllDetails() { this.$root.querySelectorAll('[data-section-detail]').forEach((el) => { el.open = false }) } }">
             <aside class="xl:col-span-3">
                 <div class="sticky top-24 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                     <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Indice</h2>
+                    <div class="mt-3 grid grid-cols-2 gap-2">
+                        <button type="button" @click="expandAllDetails" class="inline-flex cursor-pointer items-center justify-center rounded-lg bg-slate-100 px-2 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
+                            Expandir detalles
+                        </button>
+                        <button type="button" @click="collapseAllDetails" class="inline-flex cursor-pointer items-center justify-center rounded-lg bg-slate-100 px-2 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
+                            Contraer detalles
+                        </button>
+                    </div>
                     <ul class="mt-3 space-y-2">
                         @foreach($sections as $section)
                             <li>
@@ -216,7 +342,117 @@
                             @endif
                         @endif
 
-                        <div class="mt-3 text-sm leading-7 text-slate-700 dark:text-slate-200">{!! nl2br(e($section['content'])) !!}</div>
+                        @if($section['id'] === 'cumplimiento' && $criteriaMatrixRows->isNotEmpty())
+                            <div class="mt-4 overflow-hidden rounded-xl border border-emerald-200 dark:border-emerald-900/60">
+                                <div class="bg-emerald-50 px-4 py-3 dark:bg-emerald-950/30">
+                                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                        <div>
+                                            <h3 class="text-sm font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-300">Matriz de verificacion rapida</h3>
+                                            <p class="mt-1 text-xs text-emerald-700 dark:text-emerald-400">Cruce directo entre criterios detectados y puntos de evaluacion para agilizar la revision.</p>
+                                        </div>
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <button wire:click.prevent="setCriteriaPriorityFilter('all')" type="button" class="inline-flex cursor-pointer items-center rounded-md px-2.5 py-1.5 text-xs font-semibold ring-1 {{ $this->criteriaPriorityFilter === 'all' ? 'bg-emerald-100 text-emerald-800 ring-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-200 dark:ring-emerald-700' : 'bg-white text-emerald-700 ring-emerald-300 hover:bg-emerald-100 dark:bg-slate-900 dark:text-emerald-300 dark:ring-emerald-800 dark:hover:bg-emerald-900/30' }}">
+                                                Todos
+                                            </button>
+                                            <button wire:click.prevent="setCriteriaPriorityFilter('mandatory')" type="button" class="inline-flex cursor-pointer items-center rounded-md px-2.5 py-1.5 text-xs font-semibold ring-1 {{ $this->criteriaPriorityFilter === 'mandatory' ? 'bg-rose-100 text-rose-800 ring-rose-300 dark:bg-rose-900/40 dark:text-rose-200 dark:ring-rose-700' : 'bg-white text-rose-700 ring-rose-300 hover:bg-rose-100 dark:bg-slate-900 dark:text-rose-300 dark:ring-rose-800 dark:hover:bg-rose-900/30' }}">
+                                                Obligatorios
+                                            </button>
+                                            <button wire:click.prevent="setCriteriaPriorityFilter('preferable')" type="button" class="inline-flex cursor-pointer items-center rounded-md px-2.5 py-1.5 text-xs font-semibold ring-1 {{ $this->criteriaPriorityFilter === 'preferable' ? 'bg-amber-100 text-amber-800 ring-amber-300 dark:bg-amber-900/40 dark:text-amber-200 dark:ring-amber-700' : 'bg-white text-amber-700 ring-amber-300 hover:bg-amber-100 dark:bg-slate-900 dark:text-amber-300 dark:ring-amber-800 dark:hover:bg-amber-900/30' }}">
+                                                Preferentes
+                                            </button>
+                                            <button wire:click.prevent="setCriteriaPriorityFilter('optional')" type="button" class="inline-flex cursor-pointer items-center rounded-md px-2.5 py-1.5 text-xs font-semibold ring-1 {{ $this->criteriaPriorityFilter === 'optional' ? 'bg-slate-200 text-slate-800 ring-slate-300 dark:bg-slate-700 dark:text-slate-100 dark:ring-slate-600' : 'bg-white text-slate-700 ring-slate-300 hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-700 dark:hover:bg-slate-800' }}">
+                                                Opcionales
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <p class="mt-2 text-xs text-emerald-700 dark:text-emerald-400">Mostrando {{ $criteriaMatrixRows->count() }} de {{ $allCriteriaMatrixRows->count() }} criterios</p>
+                                </div>
+
+                                <div class="max-h-[28rem] overflow-auto bg-white dark:bg-slate-900">
+                                    <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
+                                        <thead class="sticky top-0 z-10 bg-slate-50 dark:bg-slate-800/95">
+                                            <tr>
+                                                <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Criterio</th>
+                                                <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Prioridad</th>
+                                                <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Puntos de evaluacion</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+                                            @foreach($criteriaMatrixRows as $row)
+                                                @php
+                                                    $priorityStyle = match ($row['priority']) {
+                                                        'mandatory' => 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',
+                                                        'preferable' => 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+                                                        default => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
+                                                    };
+
+                                                    $priorityLabel = match ($row['priority']) {
+                                                        'mandatory' => 'Obligatorio',
+                                                        'preferable' => 'Preferente',
+                                                        default => 'Opcional',
+                                                    };
+                                                @endphp
+
+                                                <tr>
+                                                    <td class="px-3 py-3 align-top text-slate-700 dark:text-slate-200">{{ $row['section'] }}</td>
+                                                    <td class="px-3 py-3 align-top">
+                                                        <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold {{ $priorityStyle }}">{{ $priorityLabel }}</span>
+                                                    </td>
+                                                    <td class="px-3 py-3 align-top text-slate-700 dark:text-slate-200">
+                                                        <ul class="space-y-1">
+                                                            @foreach($row['points'] as $point)
+                                                                <li class="flex items-start gap-2">
+                                                                    <span class="mt-1 inline-flex h-1.5 w-1.5 rounded-full bg-slate-400 dark:bg-slate-500"></span>
+                                                                    <span>{{ $point }}</span>
+                                                                </li>
+                                                            @endforeach
+                                                        </ul>
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        @endif
+
+                        @php
+                            $content = trim((string) $section['content']);
+                            $contentLength = mb_strlen($content);
+                            $paragraphs = collect(preg_split('/\n\s*\n/u', $content) ?: [])->map(fn (string $paragraph): string => trim($paragraph))->filter(fn (string $paragraph): bool => $paragraph !== '')->values();
+                            $alwaysVisibleParagraphs = $paragraphs->take(2);
+                            $collapsibleParagraphs = $paragraphs->slice(2);
+                            $shouldCollapse = $contentLength > 2600 && $collapsibleParagraphs->isNotEmpty();
+                        @endphp
+
+                        <div class="mt-3 text-sm leading-7 text-slate-700 dark:text-slate-200">
+                            @foreach($alwaysVisibleParagraphs as $paragraph)
+                                <p class="mb-4">{!! nl2br(e($paragraph)) !!}</p>
+                            @endforeach
+
+                            @if(! $shouldCollapse)
+                                @foreach($collapsibleParagraphs as $paragraph)
+                                    <p class="mb-4">{!! nl2br(e($paragraph)) !!}</p>
+                                @endforeach
+                            @endif
+                        </div>
+
+                        @if($shouldCollapse)
+                            <details data-section-detail class="group mt-1 rounded-xl border border-slate-200 bg-slate-50/80 dark:border-slate-700 dark:bg-slate-800/40">
+                                <summary class="cursor-pointer list-none px-4 py-3 text-sm font-medium text-slate-700 marker:content-none dark:text-slate-200">
+                                    <span class="inline-flex items-center gap-2">
+                                        Expandir detalle tecnico de esta seccion
+                                        <span class="text-xs text-slate-500 dark:text-slate-400">({{ $collapsibleParagraphs->count() }} bloques adicionales)</span>
+                                    </span>
+                                </summary>
+
+                                <div class="border-t border-slate-200 px-4 py-4 text-sm leading-7 text-slate-700 dark:border-slate-700 dark:text-slate-200">
+                                    @foreach($collapsibleParagraphs as $paragraph)
+                                        <p class="mb-4">{!! nl2br(e($paragraph)) !!}</p>
+                                    @endforeach
+                                </div>
+                            </details>
+                        @endif
                     </article>
                 @endforeach
 

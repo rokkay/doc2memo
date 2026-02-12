@@ -10,6 +10,8 @@ class ShowMemory extends Component
 {
     public Tender $tender;
 
+    public string $criteriaPriorityFilter = 'all';
+
     public function mount(Tender $tender): void
     {
         $this->tender = $tender;
@@ -20,7 +22,16 @@ class ShowMemory extends Component
     public function refreshMemory(): void
     {
         $this->tender->refresh();
-        $this->tender->load('technicalMemory');
+        $this->tender->load(['technicalMemory', 'extractedCriteria', 'extractedSpecifications']);
+    }
+
+    public function setCriteriaPriorityFilter(string $priority): void
+    {
+        if (! in_array($priority, ['all', 'mandatory', 'preferable', 'optional'], true)) {
+            return;
+        }
+
+        $this->criteriaPriorityFilter = $priority;
     }
 
     public function render(): View

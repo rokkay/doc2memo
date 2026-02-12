@@ -76,7 +76,7 @@ it('displays extracted criteria', function (): void {
     Livewire::test(TenderDetail::class, ['tender' => $tender])
         ->assertSee('Test Criterion')
         ->assertSee('Test criterion description')
-        ->assertSee('Mandatory');
+        ->assertSee('Obligatorio');
 });
 
 it('displays extracted specifications', function (): void {

@@ -56,6 +56,12 @@
                             'preferable' => 'warning',
                             default => 'success',
                         };
+
+                        $priorityLabel = match($criterion->priority) {
+                            'mandatory' => 'Obligatorio',
+                            'preferable' => 'Preferente',
+                            default => 'Opcional',
+                        };
                     @endphp
 
                     <article class="rounded-xl border border-slate-200 p-3 transition duration-200 hover:-translate-y-0.5 hover:shadow-sm dark:border-slate-700" wire:key="criterion-{{ $criterion->id }}">
@@ -66,7 +72,7 @@
                                 @endif
                                 {{ $criterion->section_title }}
                             </h3>
-                            <x-ui.badge :variant="$variant">{{ ucfirst($criterion->priority) }}</x-ui.badge>
+                            <x-ui.badge :variant="$variant">{{ $priorityLabel }}</x-ui.badge>
                         </div>
                         <p class="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{{ $criterion->description }}</p>
                     </article>

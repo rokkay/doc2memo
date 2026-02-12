@@ -1,6 +1,7 @@
 <?php
 
 use App\Livewire\TechnicalMemories\ShowMemory;
+use App\Models\ExtractedCriterion;
 use App\Models\TechnicalMemory;
 use App\Models\Tender;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -39,6 +40,8 @@ it('displays all sections when present', function (): void {
     ]);
 
     Livewire::test(ShowMemory::class, ['tender' => $tender])
+        ->assertSee('Resumen ejecutivo')
+        ->assertSee('Tiempo estimado lectura')
         ->assertSee('1. Introduccion')
         ->assertSee('2. Presentacion de la Empresa')
         ->assertSee('3. Enfoque Tecnico')
@@ -182,4 +185,67 @@ it('renders gantt chart block when timeline has schedulable lines', function ():
         ->assertSee('Analisis inicial')
         ->assertSee('Depende de: analysis')
         ->assertSee('Semana 6: Revision final');
+});
+
+it('shows quick verification matrix in compliance section when criteria exist', function (): void {
+    $tender = Tender::factory()->create();
+
+    ExtractedCriterion::factory()->create([
+        'tender_id' => $tender->id,
+        'section_number' => '7.2',
+        'section_title' => 'Criterio tecnico',
+        'description' => "1) Plan de migracion\n2) Riesgos y mitigaciones",
+        'priority' => 'mandatory',
+    ]);
+
+    TechnicalMemory::factory()->create([
+        'tender_id' => $tender->id,
+        'compliance_matrix' => 'Bloque de cumplimiento amplio con estrategia de verificacion.',
+    ]);
+
+    Livewire::test(ShowMemory::class, ['tender' => $tender])
+        ->assertSee('Matriz de verificacion rapida')
+        ->assertSee('Puntos de evaluacion')
+        ->assertSee('Criterio tecnico')
+        ->assertSee('Plan de migracion')
+        ->assertSee('Mostrando 1 de 1 criterios');
+});
+
+it('filters quick verification matrix to mandatory criteria', function (): void {
+    $tender = Tender::factory()->create();
+
+    ExtractedCriterion::factory()->create([
+        'tender_id' => $tender->id,
+        'section_title' => 'Criterio obligatorio UX',
+        'description' => 'Exigencia prioritaria',
+        'priority' => 'mandatory',
+    ]);
+
+    ExtractedCriterion::factory()->create([
+        'tender_id' => $tender->id,
+        'section_title' => 'Criterio opcional UX',
+        'description' => 'Mejora recomendada',
+        'priority' => 'optional',
+    ]);
+
+    TechnicalMemory::factory()->create([
+        'tender_id' => $tender->id,
+        'compliance_matrix' => 'Bloque de cumplimiento con filtros.',
+    ]);
+
+    Livewire::test(ShowMemory::class, ['tender' => $tender])
+        ->assertSee('Todos')
+        ->assertSee('Obligatorios')
+        ->assertSee('Preferentes')
+        ->assertSee('Opcionales')
+        ->assertSee('Mostrando 2 de 2 criterios')
+        ->assertSee('Criterio obligatorio UX')
+        ->assertSee('Criterio opcional UX')
+        ->call('setCriteriaPriorityFilter', 'mandatory')
+        ->assertSee('Mostrando 1 de 2 criterios')
+        ->assertSee('Criterio obligatorio UX')
+        ->assertDontSee('Criterio opcional UX')
+        ->call('setCriteriaPriorityFilter', 'all')
+        ->assertSee('Mostrando 2 de 2 criterios')
+        ->assertSee('Criterio opcional UX');
 });
