@@ -117,27 +117,15 @@ it('has back link', function (): void {
         ->assertSee(route('technical-memories.download-markdown', $memory));
 });
 
-it('shows download button when file path exists', function (): void {
+it('shows download button', function (): void {
     $tender = Tender::factory()->create();
     $memory = TechnicalMemory::factory()->create([
         'tender_id' => $tender->id,
-        'generated_file_path' => 'technical-memories/memoria.pdf',
     ]);
 
     Livewire::test(ShowMemory::class, ['tender' => $tender])
         ->assertSee('Descargar PDF')
         ->assertSee(route('technical-memories.download', $memory));
-});
-
-it('hides download button when no file path', function (): void {
-    $tender = Tender::factory()->create();
-    TechnicalMemory::factory()->create([
-        'tender_id' => $tender->id,
-        'generated_file_path' => null,
-    ]);
-
-    Livewire::test(ShowMemory::class, ['tender' => $tender])
-        ->assertDontSee('Descargar PDF');
 });
 
 it('shows empty state when no memory exists', function (): void {

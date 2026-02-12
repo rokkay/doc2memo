@@ -137,16 +137,14 @@
                             </svg>
                             Descargar Markdown
                         </a>
-                        @if($memory->generated_file_path)
-                            <a href="{{ route('technical-memories.download', $memory) }}" class="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700">
-                                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v10" />
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 10l4 4 4-4" />
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 20h16" />
-                                </svg>
-                                Descargar PDF
-                            </a>
-                        @endif
+                        <a href="{{ route('technical-memories.download', $memory) }}" class="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700">
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v10" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M8 10l4 4 4-4" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 20h16" />
+                            </svg>
+                            Descargar PDF
+                        </a>
                     </div>
                 </div>
 

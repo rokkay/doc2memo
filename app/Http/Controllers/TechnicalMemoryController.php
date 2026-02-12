@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\TechnicalMemory;
 use App\Models\Tender;
 use App\Support\TechnicalMemorySections;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
+use Spatie\LaravelPdf\PdfBuilder;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+
+use function Spatie\LaravelPdf\Support\pdf;
 
 class TechnicalMemoryController extends Controller
 {
@@ -16,16 +18,34 @@ class TechnicalMemoryController extends Controller
         return view('technical-memories.show', compact('tender'));
     }
 
-    public function download(TechnicalMemory $technicalMemory): StreamedResponse
+    public function download(TechnicalMemory $technicalMemory): PdfBuilder
     {
-        if (! $technicalMemory->generated_file_path || ! Storage::exists($technicalMemory->generated_file_path)) {
-            abort(404, 'Technical memory file not found.');
-        }
+        $technicalMemory->loadMissing('tender');
 
-        return Storage::download(
-            $technicalMemory->generated_file_path,
-            'Memoria_Tecnica_'.$technicalMemory->tender->reference_number.'.pdf'
-        );
+        $sections = collect(TechnicalMemorySections::fields())
+            ->map(function (string $field) use ($technicalMemory): ?array {
+                $content = trim((string) ($technicalMemory->{$field} ?? ''));
+
+                if ($content === '') {
+                    return null;
+                }
+
+                return [
+                    'title' => TechnicalMemorySections::title($field),
+                    'content' => $content,
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+
+        return pdf()
+            ->view('technical-memories.pdf', [
+                'technicalMemory' => $technicalMemory,
+                'sections' => $sections,
+            ])
+            ->name('Memoria_Tecnica_'.($technicalMemory->tender->reference_number ?: $technicalMemory->id).'.pdf')
+            ->download();
     }
 
     public function downloadMarkdown(TechnicalMemory $technicalMemory): StreamedResponse
