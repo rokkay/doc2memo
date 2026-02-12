@@ -21,6 +21,36 @@ class TechnicalMemoryFactory extends Factory
             'methodology' => fake()->optional()->paragraph(),
             'team_structure' => fake()->optional()->paragraph(),
             'timeline' => fake()->optional()->paragraph(),
+            'timeline_plan' => fake()->optional()->randomElement([
+                [
+                    'total_weeks' => 8,
+                    'tasks' => [
+                        [
+                            'id' => 'task-analysis',
+                            'title' => 'Analisis inicial',
+                            'lane' => 'Planificacion',
+                            'start_week' => 1,
+                            'end_week' => 2,
+                            'depends_on' => [],
+                        ],
+                        [
+                            'id' => 'task-proposal',
+                            'title' => 'Diseno y redaccion',
+                            'lane' => 'Ejecucion',
+                            'start_week' => 3,
+                            'end_week' => 6,
+                            'depends_on' => ['task-analysis'],
+                        ],
+                    ],
+                    'milestones' => [
+                        [
+                            'title' => 'Entrega final',
+                            'week' => 8,
+                        ],
+                    ],
+                ],
+                null,
+            ]),
             'quality_assurance' => fake()->optional()->paragraph(),
             'risk_management' => fake()->optional()->paragraph(),
             'compliance_matrix' => fake()->optional()->paragraph(),

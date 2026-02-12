@@ -80,6 +80,7 @@ final class GenerateTechnicalMemoryAction
                 'methodology' => (string) ($memoryData['methodology'] ?? ''),
                 'team_structure' => (string) ($memoryData['team_structure'] ?? ''),
                 'timeline' => (string) ($memoryData['timeline'] ?? ''),
+                'timeline_plan' => is_array($memoryData['timeline_plan'] ?? null) ? $memoryData['timeline_plan'] : null,
                 'quality_assurance' => (string) ($memoryData['quality_assurance'] ?? ''),
                 'risk_management' => (string) ($memoryData['risk_management'] ?? ''),
                 'compliance_matrix' => (string) ($memoryData['compliance_matrix'] ?? ''),

@@ -54,6 +54,33 @@ it('generates a technical memory from extracted data', function (): void {
             'methodology' => 'Metodologia de trabajo iterativa.',
             'team_structure' => 'Equipo con jefe de proyecto y analistas.',
             'timeline' => 'Plan de 24 meses con hitos trimestrales.',
+            'timeline_plan' => [
+                'total_weeks' => 24,
+                'tasks' => [
+                    [
+                        'id' => 'analysis',
+                        'title' => 'Analisis inicial',
+                        'lane' => 'Planificacion',
+                        'start_week' => 1,
+                        'end_week' => 4,
+                        'depends_on' => [],
+                    ],
+                    [
+                        'id' => 'implementation',
+                        'title' => 'Ejecucion tecnica',
+                        'lane' => 'Ejecucion',
+                        'start_week' => 5,
+                        'end_week' => 20,
+                        'depends_on' => ['analysis'],
+                    ],
+                ],
+                'milestones' => [
+                    [
+                        'title' => 'Entrega final',
+                        'week' => 24,
+                    ],
+                ],
+            ],
             'quality_assurance' => 'Plan de calidad y pruebas.',
             'risk_management' => 'Matriz de riesgos y mitigaciones.',
             'compliance_matrix' => 'Tabla de cumplimiento criterio-solucion.',
@@ -68,4 +95,11 @@ it('generates a technical memory from extracted data', function (): void {
         'status' => 'generated',
         'title' => 'Memoria tecnica para '.$tender->title,
     ]);
+
+    $memory = $tender->fresh()->technicalMemory;
+
+    expect($memory)->not->toBeNull();
+    expect($memory?->timeline_plan)->toBeArray();
+    expect(data_get($memory?->timeline_plan, 'total_weeks'))->toBe(24);
+    expect(data_get($memory?->timeline_plan, 'tasks.0.id'))->toBe('analysis');
 });

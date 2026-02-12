@@ -113,3 +113,47 @@ it('shows empty state when no memory exists', function (): void {
         ->assertSee('Volver a la licitacion')
         ->assertSee(route('tenders.show', $tender));
 });
+
+it('renders gantt chart block when timeline has schedulable lines', function (): void {
+    $tender = Tender::factory()->create();
+
+    TechnicalMemory::factory()->create([
+        'tender_id' => $tender->id,
+        'timeline' => 'Cronograma narrativo para entrega por fases.',
+        'timeline_plan' => [
+            'total_weeks' => 6,
+            'tasks' => [
+                [
+                    'id' => 'analysis',
+                    'title' => 'Analisis inicial',
+                    'lane' => 'Planificacion',
+                    'start_week' => 1,
+                    'end_week' => 2,
+                    'depends_on' => [],
+                ],
+                [
+                    'id' => 'proposal',
+                    'title' => 'Desarrollo de propuesta',
+                    'lane' => 'Ejecucion',
+                    'start_week' => 3,
+                    'end_week' => 5,
+                    'depends_on' => ['analysis'],
+                ],
+            ],
+            'milestones' => [
+                [
+                    'title' => 'Revision final',
+                    'week' => 6,
+                ],
+            ],
+        ],
+    ]);
+
+    Livewire::test(ShowMemory::class, ['tender' => $tender])
+        ->assertSee('Diagrama de cronograma')
+        ->assertSee('6 semanas estimadas')
+        ->assertSee('Semanas 1-2')
+        ->assertSee('Analisis inicial')
+        ->assertSee('Depende de: analysis')
+        ->assertSee('Semana 6: Revision final');
+});

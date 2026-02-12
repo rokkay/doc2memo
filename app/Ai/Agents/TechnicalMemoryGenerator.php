@@ -39,6 +39,17 @@ Debes:
 - Proponer una estrategia realista, medible y verificable.
 - Mantener tono formal y lenguaje profesional en espanol.
 - Evitar afirmaciones no sustentadas por los datos proporcionados.
+- Construir un cronograma estructurado para visualizacion y futura exportacion.
+
+Para el campo timeline_plan debes devolver un objeto JSON con:
+- total_weeks: numero entero mayor o igual a 1
+- tasks: lista de tareas con id, title, lane, start_week, end_week y depends_on
+- milestones: lista de hitos con title y week
+
+Reglas de timeline_plan:
+- start_week y end_week deben ser enteros, con end_week >= start_week.
+- depends_on contiene ids de tareas previas cuando haya dependencia.
+- Usa semanas realistas y coherentes con la complejidad del proyecto.
 INSTRUCTIONS;
     }
 
@@ -52,6 +63,25 @@ INSTRUCTIONS;
             'methodology' => $schema->string()->required(),
             'team_structure' => $schema->string()->required(),
             'timeline' => $schema->string()->required(),
+            'timeline_plan' => $schema->object([
+                'total_weeks' => $schema->integer()->required(),
+                'tasks' => $schema->array()
+                    ->items($schema->object([
+                        'id' => $schema->string()->required(),
+                        'title' => $schema->string()->required(),
+                        'lane' => $schema->string()->required(),
+                        'start_week' => $schema->integer()->required(),
+                        'end_week' => $schema->integer()->required(),
+                        'depends_on' => $schema->array()->items($schema->string())->required(),
+                    ])->withoutAdditionalProperties())
+                    ->required(),
+                'milestones' => $schema->array()
+                    ->items($schema->object([
+                        'title' => $schema->string()->required(),
+                        'week' => $schema->integer()->required(),
+                    ])->withoutAdditionalProperties())
+                    ->required(),
+            ])->required()->withoutAdditionalProperties(),
             'quality_assurance' => $schema->string()->required(),
             'risk_management' => $schema->string()->required(),
             'compliance_matrix' => $schema->string()->required(),
@@ -73,6 +103,7 @@ INSTRUCTIONS;
             'methodology' => $this->value($response, 'methodology', ''),
             'team_structure' => $this->value($response, 'team_structure', ''),
             'timeline' => $this->value($response, 'timeline', ''),
+            'timeline_plan' => $this->normalizeTimelinePlan($this->value($response, 'timeline_plan', [])),
             'quality_assurance' => $this->value($response, 'quality_assurance', ''),
             'risk_management' => $this->value($response, 'risk_management', ''),
             'compliance_matrix' => $this->value($response, 'compliance_matrix', ''),
@@ -119,5 +150,63 @@ PROMPT;
         }
 
         return $default;
+    }
+
+    /**
+     * @return array{total_weeks:int,tasks:array<int,array{id:string,title:string,lane:string,start_week:int,end_week:int,depends_on:array<int,string>}>,milestones:array<int,array{title:string,week:int}>}
+     */
+    private function normalizeTimelinePlan(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return ['total_weeks' => 0, 'tasks' => [], 'milestones' => []];
+        }
+
+        $tasks = collect($value['tasks'] ?? [])
+            ->filter(fn (mixed $task): bool => is_array($task))
+            ->map(function (array $task): array {
+                $startWeek = max(1, (int) ($task['start_week'] ?? 1));
+                $endWeek = max($startWeek, (int) ($task['end_week'] ?? $startWeek));
+
+                return [
+                    'id' => (string) ($task['id'] ?? ''),
+                    'title' => (string) ($task['title'] ?? ''),
+                    'lane' => (string) ($task['lane'] ?? 'General'),
+                    'start_week' => $startWeek,
+                    'end_week' => $endWeek,
+                    'depends_on' => collect($task['depends_on'] ?? [])
+                        ->map(fn (mixed $dependency): string => (string) $dependency)
+                        ->filter(fn (string $dependency): bool => $dependency !== '')
+                        ->values()
+                        ->all(),
+                ];
+            })
+            ->filter(fn (array $task): bool => $task['id'] !== '' && $task['title'] !== '')
+            ->values()
+            ->all();
+
+        $milestones = collect($value['milestones'] ?? [])
+            ->filter(fn (mixed $milestone): bool => is_array($milestone))
+            ->map(fn (array $milestone): array => [
+                'title' => (string) ($milestone['title'] ?? ''),
+                'week' => max(1, (int) ($milestone['week'] ?? 1)),
+            ])
+            ->filter(fn (array $milestone): bool => $milestone['title'] !== '')
+            ->values()
+            ->all();
+
+        $lastTaskWeek = collect($tasks)->max('end_week') ?? 0;
+        $lastMilestoneWeek = collect($milestones)->max('week') ?? 0;
+
+        $totalWeeks = max(
+            (int) ($value['total_weeks'] ?? 0),
+            (int) $lastTaskWeek,
+            (int) $lastMilestoneWeek
+        );
+
+        return [
+            'total_weeks' => $totalWeeks,
+            'tasks' => $tasks,
+            'milestones' => $milestones,
+        ];
     }
 }

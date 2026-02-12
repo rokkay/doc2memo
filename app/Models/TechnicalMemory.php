@@ -19,6 +19,7 @@ class TechnicalMemory extends Model
         'methodology',
         'team_structure',
         'timeline',
+        'timeline_plan',
         'quality_assurance',
         'risk_management',
         'compliance_matrix',
@@ -32,6 +33,7 @@ class TechnicalMemory extends Model
     {
         return [
             'generated_at' => 'datetime',
+            'timeline_plan' => 'array',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];

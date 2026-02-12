@@ -86,6 +86,115 @@
                 @foreach($sections as $section)
                     <article id="{{ $section['id'] }}" class="memory-section scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
                         <h2 class="text-xl font-bold text-slate-900 dark:text-slate-100">{{ $section['title'] }}</h2>
+
+                        @if($section['id'] === 'cronograma')
+                            @php
+                                $timelinePlan = is_array($memory->timeline_plan ?? null)
+                                    ? $memory->timeline_plan
+                                    : [];
+
+                                $timelineTasks = collect($timelinePlan['tasks'] ?? [])
+                                    ->filter(fn (mixed $task): bool => is_array($task))
+                                    ->map(function (array $task): array {
+                                        $startWeek = max(1, (int) ($task['start_week'] ?? 1));
+                                        $endWeek = max($startWeek, (int) ($task['end_week'] ?? $startWeek));
+
+                                        return [
+                                            'id' => (string) ($task['id'] ?? ''),
+                                            'title' => (string) ($task['title'] ?? ''),
+                                            'lane' => (string) ($task['lane'] ?? 'General'),
+                                            'start_week' => $startWeek,
+                                            'end_week' => $endWeek,
+                                            'depends_on' => collect($task['depends_on'] ?? [])
+                                                ->map(fn (mixed $dependency): string => (string) $dependency)
+                                                ->filter(fn (string $dependency): bool => $dependency !== '')
+                                                ->values()
+                                                ->all(),
+                                        ];
+                                    })
+                                    ->filter(fn (array $task): bool => $task['id'] !== '' && $task['title'] !== '')
+                                    ->values();
+
+                                $timelineMilestones = collect($timelinePlan['milestones'] ?? [])
+                                    ->filter(fn (mixed $milestone): bool => is_array($milestone))
+                                    ->map(fn (array $milestone): array => [
+                                        'title' => (string) ($milestone['title'] ?? ''),
+                                        'week' => max(1, (int) ($milestone['week'] ?? 1)),
+                                    ])
+                                    ->filter(fn (array $milestone): bool => $milestone['title'] !== '')
+                                    ->values();
+
+                                $ganttTotalWeeks = max(
+                                    (int) ($timelinePlan['total_weeks'] ?? 0),
+                                    (int) ($timelineTasks->max('end_week') ?? 0),
+                                    (int) ($timelineMilestones->max('week') ?? 0)
+                                );
+
+                                $weekLabelStep = match (true) {
+                                    $ganttTotalWeeks > 40 => 8,
+                                    $ganttTotalWeeks > 24 => 4,
+                                    $ganttTotalWeeks > 16 => 2,
+                                    default => 1,
+                                };
+
+                            @endphp
+
+                            @if($timelineTasks->isNotEmpty() && $ganttTotalWeeks > 0)
+                                <div class="mt-4 rounded-xl border border-cyan-200 bg-cyan-50/60 p-4 dark:border-cyan-900/70 dark:bg-cyan-950/20">
+                                    <div class="mb-3 flex items-center justify-between">
+                                        <h3 class="text-sm font-semibold uppercase tracking-wide text-cyan-800 dark:text-cyan-300">Diagrama de cronograma</h3>
+                                        <span class="text-xs text-cyan-700 dark:text-cyan-400">{{ $ganttTotalWeeks }} semanas estimadas</span>
+                                    </div>
+
+                                    <div class="rounded-lg border border-cyan-200/70 bg-white/70 p-3 dark:border-cyan-900/60 dark:bg-slate-900/40">
+                                        <div class="mb-2 hidden grid-cols-[13rem,1fr] gap-2 sm:grid">
+                                            <span class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Actividad</span>
+                                            <div class="grid auto-cols-fr grid-flow-col gap-1 text-[10px] text-slate-500 dark:text-slate-400">
+                                                @for($week = 1; $week <= $ganttTotalWeeks; $week++)
+                                                    <span class="text-center whitespace-nowrap">
+                                                        {{ $week === 1 || $week === $ganttTotalWeeks || $week % $weekLabelStep === 0 ? 'S'.$week : '' }}
+                                                    </span>
+                                                @endfor
+                                            </div>
+                                        </div>
+
+                                        <div class="space-y-2">
+                                            @foreach($timelineTasks as $task)
+                                                <div class="grid grid-cols-1 gap-2 sm:grid-cols-[13rem,1fr] sm:items-center">
+                                                    <div>
+                                                        <p class="text-sm text-slate-700 dark:text-slate-200">{{ $task['title'] }}</p>
+                                                        <p class="text-xs text-slate-500 dark:text-slate-400">{{ $task['lane'] }}</p>
+                                                    </div>
+                                                    <div class="space-y-1">
+                                                        <div class="grid auto-cols-fr grid-flow-col gap-1 overflow-hidden rounded-lg bg-white p-1 ring-1 ring-cyan-100 dark:bg-slate-900/70 dark:ring-cyan-900/60">
+                                                            @for($week = 1; $week <= $ganttTotalWeeks; $week++)
+                                                                <span class="h-4 rounded-sm {{ $week >= $task['start_week'] && $week <= $task['end_week'] ? 'bg-cyan-500/80' : 'bg-slate-200 dark:bg-slate-700' }}"></span>
+                                                            @endfor
+                                                        </div>
+                                                        <p class="text-xs text-slate-600 dark:text-slate-300">Semanas {{ $task['start_week'] }}-{{ $task['end_week'] }}</p>
+                                                        @if(! empty($task['depends_on']))
+                                                            <p class="text-xs text-slate-500 dark:text-slate-400">Depende de: {{ implode(', ', $task['depends_on']) }}</p>
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+
+                                    @if($timelineMilestones->isNotEmpty())
+                                        <div class="mt-4 border-t border-cyan-200 pt-3 dark:border-cyan-900/60">
+                                            <p class="text-xs font-semibold uppercase tracking-wide text-cyan-800 dark:text-cyan-300">Hitos</p>
+                                            <ul class="mt-2 space-y-1 text-sm text-slate-700 dark:text-slate-200">
+                                                @foreach($timelineMilestones as $milestone)
+                                                    <li>Semana {{ $milestone['week'] }}: {{ $milestone['title'] }}</li>
+                                                @endforeach
+                                            </ul>
+                                        </div>
+                                    @endif
+                                </div>
+                            @endif
+                        @endif
+
                         <div class="mt-3 text-sm leading-7 text-slate-700 dark:text-slate-200">{!! nl2br(e($section['content'])) !!}</div>
                     </article>
                 @endforeach
