@@ -51,12 +51,12 @@ it('downloads the technical memory in pdf format', function (): void {
             && $pdf->footerViewName === 'technical-memories.pdf-footer'
             && $pdf->format === 'a4'
             && $pdf->margins === [
-                'top' => 24.0,
-                'right' => 14.0,
-                'bottom' => 20.0,
-                'left' => 14.0,
+                'top' => 34.0,
+                'right' => 18.0,
+                'bottom' => 30.0,
+                'left' => 18.0,
                 'unit' => 'mm',
             ]
-            && $pdf->contains(['Documento técnico', '## 1.1 Introducción', 'Página @pageNumber de @totalPages']);
+            && $pdf->contains(['Documento técnico', 'Indice', '## 1.1 Introducción', 'Página @pageNumber de @totalPages']);
     });
 });
