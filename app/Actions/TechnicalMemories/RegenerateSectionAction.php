@@ -70,6 +70,13 @@ final class RegenerateSectionAction
             'content' => null,
         ]);
 
+        resolve(UpsertMetricRunSummaryAction::class)(
+            memory: $memory,
+            runId: (string) $context->runId,
+            trigger: 'section_regeneration',
+            sectionsTotal: 1,
+        );
+
         GenerateTechnicalMemorySection::dispatch(
             technicalMemorySectionId: $section->id,
             section: $sectionData,

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Tenders;
 
+use App\Actions\TechnicalMemories\UpsertMetricRunSummaryAction;
 use App\Data\JudgmentCriterionData;
 use App\Data\TechnicalMemoryGenerationContextData;
 use App\Data\TechnicalMemorySectionData;
@@ -104,6 +105,13 @@ final class GenerateTechnicalMemoryAction
         $memory->sections()->delete();
 
         if ($sectionGroups->isEmpty()) {
+            resolve(UpsertMetricRunSummaryAction::class)(
+                memory: $memory,
+                runId: (string) $generationContext->runId,
+                trigger: 'full_generation',
+                sectionsTotal: 0,
+            );
+
             $memory->update([
                 'status' => 'generated',
                 'generated_at' => now(),
@@ -111,6 +119,13 @@ final class GenerateTechnicalMemoryAction
 
             return;
         }
+
+        resolve(UpsertMetricRunSummaryAction::class)(
+            memory: $memory,
+            runId: (string) $generationContext->runId,
+            trigger: 'full_generation',
+            sectionsTotal: $sectionGroups->count(),
+        );
 
         $totalPoints = (float) $sectionGroups->sum(fn (TechnicalMemorySectionData $group): float => $group->totalPoints);
 

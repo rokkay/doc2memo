@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Actions\TechnicalMemories\RecordMetricEventAction;
+use App\Actions\TechnicalMemories\UpsertMetricRunSummaryAction;
 use App\Ai\Agents\TechnicalMemoryDynamicSectionAgent;
 use App\Ai\Agents\TechnicalMemorySectionEditorAgent;
 use App\Data\TechnicalMemoryGenerationContextData;
@@ -46,6 +47,7 @@ class GenerateTechnicalMemorySection implements ShouldQueue
 
         $memory = $section->technicalMemory;
         $recordMetricEvent = new RecordMetricEventAction;
+        $upsertMetricRunSummary = resolve(UpsertMetricRunSummaryAction::class);
         $attempt = $this->qualityAttempt + 1;
         $usedStyleEditor = (bool) config('technical_memory.style_editor.enabled', true);
         $outputChars = null;
@@ -193,6 +195,11 @@ class GenerateTechnicalMemorySection implements ShouldQueue
                     ],
                 );
 
+                $upsertMetricRunSummary(
+                    memory: $memory,
+                    runId: (string) $context->runId,
+                );
+
                 return;
             }
 
@@ -218,6 +225,11 @@ class GenerateTechnicalMemorySection implements ShouldQueue
                 metadata: [
                     'quality_attempt' => $this->qualityAttempt,
                 ],
+            );
+
+            $upsertMetricRunSummary(
+                memory: $memory,
+                runId: (string) $context->runId,
             );
 
             Log::info('Technical memory section generation completed.', [
@@ -250,6 +262,11 @@ class GenerateTechnicalMemorySection implements ShouldQueue
                     'error' => $exception->getMessage(),
                     'exception_class' => $exception::class,
                 ],
+            );
+
+            $upsertMetricRunSummary(
+                memory: $memory,
+                runId: (string) $context->runId,
             );
 
             Log::error('Technical memory section generation failed.', [
