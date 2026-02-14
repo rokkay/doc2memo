@@ -17,4 +17,19 @@ return [
     'metrics' => [
         'retention_days' => 90,
     ],
+
+    'cost' => [
+        'models' => [
+            'gpt-5-mini' => [
+                'input_price_per_unit_usd' => 0.5,
+                'output_price_per_unit_usd' => 1.0,
+                'unit_basis_chars' => 4_000_000,
+            ],
+            'gpt-5.2' => [
+                'input_price_per_unit_usd' => 0.9,
+                'output_price_per_unit_usd' => 1.5,
+                'unit_basis_chars' => 4_000_000,
+            ],
+        ],
+    ],
 ];
