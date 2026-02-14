@@ -6,6 +6,7 @@ namespace App\ViewData;
 
 use App\Enums\TechnicalMemorySectionStatus;
 use App\Models\Tender;
+use App\Support\TechnicalMemoryMetrics;
 use App\Support\SectionTitleNormalizer;
 use App\Support\TechnicalMemoryMarkdownBuilder;
 
@@ -27,6 +28,12 @@ final class TechnicalMemoryViewData
         public readonly float $totalPoints,
         public readonly int $progressPercent,
         public readonly string $markdownExport,
+        public readonly ?string $latestRunStatus,
+        public readonly ?int $latestRunDurationMs,
+        public readonly ?int $avgSectionDurationMs,
+        public readonly float $firstPassRate,
+        public readonly float $retryRate,
+        public readonly float $failureRate,
     ) {}
 
     public static function fromTender(Tender $tender): self
@@ -45,7 +52,60 @@ final class TechnicalMemoryViewData
                 totalPoints: 0.0,
                 progressPercent: 0,
                 markdownExport: '',
+                latestRunStatus: null,
+                latestRunDurationMs: null,
+                avgSectionDurationMs: null,
+                firstPassRate: 0.0,
+                retryRate: 0.0,
+                failureRate: 0.0,
             );
+        }
+
+        $latestRun = $memory->metricRuns()->latest('created_at')->latest('id')->first();
+
+        $latestRunStatus = null;
+        $latestRunDurationMs = null;
+        $avgSectionDurationMs = null;
+        $firstPassRate = 0.0;
+        $retryRate = 0.0;
+        $failureRate = 0.0;
+
+        if ($latestRun !== null) {
+            $latestRunStatus = (string) $latestRun->status;
+            $latestRunDurationMs = $latestRun->duration_ms !== null ? (int) $latestRun->duration_ms : null;
+
+            $events = $memory->metricEvents()
+                ->where('run_id', $latestRun->run_id)
+                ->orderBy('id')
+                ->get();
+
+            $terminalEventsBySection = $events
+                ->filter(fn ($event): bool => $event->technical_memory_section_id !== null)
+                ->groupBy('technical_memory_section_id')
+                ->map(fn ($sectionEvents) => $sectionEvents
+                    ->whereIn('event_type', [TechnicalMemoryMetrics::EVENT_COMPLETED, TechnicalMemoryMetrics::EVENT_FAILED])
+                    ->last())
+                ->filter();
+
+            $durations = $terminalEventsBySection
+                ->pluck('duration_ms')
+                ->filter(fn ($duration): bool => is_int($duration));
+
+            if ($durations->isNotEmpty()) {
+                $avgSectionDurationMs = (int) round($durations->avg());
+            }
+
+            $sectionsTotal = (int) $latestRun->sections_total;
+
+            if ($sectionsTotal > 0) {
+                $completedOnFirstPass = $terminalEventsBySection
+                    ->filter(fn ($event): bool => $event->event_type === TechnicalMemoryMetrics::EVENT_COMPLETED && $event->attempt === 1)
+                    ->count();
+
+                $firstPassRate = round(($completedOnFirstPass / $sectionsTotal) * 100, 1);
+                $retryRate = round((((int) $latestRun->sections_retried) / $sectionsTotal) * 100, 1);
+                $failureRate = round((((int) $latestRun->sections_failed) / $sectionsTotal) * 100, 1);
+            }
         }
 
         $criteriaByGroup = $tender->extractedCriteria
@@ -134,6 +194,12 @@ final class TechnicalMemoryViewData
             totalPoints: $totalPoints,
             progressPercent: $progressPercent,
             markdownExport: TechnicalMemoryMarkdownBuilder::build($memory),
+            latestRunStatus: $latestRunStatus,
+            latestRunDurationMs: $latestRunDurationMs,
+            avgSectionDurationMs: $avgSectionDurationMs,
+            firstPassRate: $firstPassRate,
+            retryRate: $retryRate,
+            failureRate: $failureRate,
         );
     }
 }

@@ -102,6 +102,63 @@ it('polls and shows dynamic progress while generation is in draft', function ():
         ->assertSeeHtml('wire:poll.2s.visible="refreshMemory"');
 });
 
+it('shows internal operational metrics for the latest run', function (): void {
+    $tender = Tender::factory()->create();
+    $memory = TechnicalMemory::factory()->create([
+        'tender_id' => $tender->id,
+    ]);
+
+    $sectionOne = TechnicalMemorySection::factory()->create([
+        'technical_memory_id' => $memory->id,
+        'status' => 'completed',
+    ]);
+
+    $sectionTwo = TechnicalMemorySection::factory()->create([
+        'technical_memory_id' => $memory->id,
+        'status' => 'completed',
+    ]);
+
+    $memory->metricRuns()->create([
+        'run_id' => 'run-latest-1',
+        'trigger' => 'full_generation',
+        'status' => 'completed',
+        'sections_total' => 2,
+        'sections_completed' => 2,
+        'sections_failed' => 0,
+        'sections_retried' => 1,
+        'duration_ms' => 4200,
+    ]);
+
+    $memory->metricEvents()->create([
+        'technical_memory_section_id' => $sectionOne->id,
+        'run_id' => 'run-latest-1',
+        'attempt' => 1,
+        'event_type' => 'completed',
+        'duration_ms' => 2000,
+        'quality_passed' => true,
+        'quality_reasons' => [],
+    ]);
+
+    $memory->metricEvents()->create([
+        'technical_memory_section_id' => $sectionTwo->id,
+        'run_id' => 'run-latest-1',
+        'attempt' => 2,
+        'event_type' => 'completed',
+        'duration_ms' => 3000,
+        'quality_passed' => true,
+        'quality_reasons' => [],
+    ]);
+
+    Livewire::test(ShowMemory::class, ['tender' => $tender])
+        ->assertSee('Métricas operativas internas')
+        ->assertSee('completed')
+        ->assertSee('4200 ms')
+        ->assertSee('2500 ms')
+        ->assertSee('50,0%')
+        ->assertSee('50,0%')
+        ->assertSee('0,0%');
+});
+
 it('shows judgment matrix and supports priority filters', function (): void {
     $tender = Tender::factory()->create();
     $memory = TechnicalMemory::factory()->create([

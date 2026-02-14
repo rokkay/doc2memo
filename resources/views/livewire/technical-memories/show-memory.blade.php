@@ -91,6 +91,41 @@
                 </div>
             </section>
 
+            @if($view->latestRunStatus !== null)
+                <section class="overflow-hidden rounded-2xl border border-indigo-200 bg-white shadow-sm dark:border-indigo-900/60 dark:bg-slate-900">
+                    <div class="bg-indigo-50 px-4 py-3 dark:bg-indigo-950/30">
+                        <h3 class="text-sm font-semibold uppercase tracking-wide text-indigo-800 dark:text-indigo-300">Métricas operativas internas</h3>
+                        <p class="mt-1 text-xs text-indigo-700 dark:text-indigo-400">Última ejecución de generación técnica.</p>
+                    </div>
+                    <div class="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
+                        <div class="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800/70">
+                            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Estado última ejecución</p>
+                            <p class="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{{ $view->latestRunStatus }}</p>
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800/70">
+                            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Duración última ejecución</p>
+                            <p class="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{{ $view->latestRunDurationMs !== null ? $view->latestRunDurationMs.' ms' : 'N/D' }}</p>
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800/70">
+                            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Duración media por sección</p>
+                            <p class="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{{ $view->avgSectionDurationMs !== null ? $view->avgSectionDurationMs.' ms' : 'N/D' }}</p>
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800/70">
+                            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">First pass rate</p>
+                            <p class="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{{ number_format($view->firstPassRate, 1, ',', '.') }}%</p>
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800/70">
+                            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Retry rate</p>
+                            <p class="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{{ number_format($view->retryRate, 1, ',', '.') }}%</p>
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800/70">
+                            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Failure rate</p>
+                            <p class="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{{ number_format($view->failureRate, 1, ',', '.') }}%</p>
+                        </div>
+                    </div>
+                </section>
+            @endif
+
             <section class="overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-sm dark:border-emerald-900/60 dark:bg-slate-900">
                 <div class="bg-emerald-50 px-4 py-3 dark:bg-emerald-950/30">
                     <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
