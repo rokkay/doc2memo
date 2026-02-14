@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Tenders;
 
+use App\Enums\TechnicalMemorySectionStatus;
 use App\Jobs\GenerateTechnicalMemory;
 use App\Models\Tender;
 use App\Services\DocumentAnalysisService;
@@ -77,6 +78,66 @@ class TenderDetail extends Component
         return $this->tender->documents
             ->whereIn('status', ['uploaded', 'failed'])
             ->isNotEmpty();
+    }
+
+    /**
+     * @return array{
+     *   has_sections:bool,
+     *   pending_count:int,
+     *   generating_count:int,
+     *   completed_count:int,
+     *   failed_count:int,
+     *   total_count:int,
+     *   generating_titles:array<int,string>,
+     *   pending_titles:array<int,string>
+     * }
+     */
+    #[Computed]
+    public function memoryProgress(): array
+    {
+        $memory = $this->tender->technicalMemory;
+
+        if (! $memory) {
+            return [
+                'has_sections' => false,
+                'pending_count' => 0,
+                'generating_count' => 0,
+                'completed_count' => 0,
+                'failed_count' => 0,
+                'total_count' => 0,
+                'generating_titles' => [],
+                'pending_titles' => [],
+            ];
+        }
+
+        $sections = $memory->sections;
+        $pendingSections = $sections->where('status', TechnicalMemorySectionStatus::Pending);
+        $generatingSections = $sections->where('status', TechnicalMemorySectionStatus::Generating);
+        $completedSections = $sections->where('status', TechnicalMemorySectionStatus::Completed);
+        $failedSections = $sections->where('status', TechnicalMemorySectionStatus::Failed);
+
+        return [
+            'has_sections' => $sections->isNotEmpty(),
+            'pending_count' => $pendingSections->count(),
+            'generating_count' => $generatingSections->count(),
+            'completed_count' => $completedSections->count(),
+            'failed_count' => $failedSections->count(),
+            'total_count' => $sections->count(),
+            'generating_titles' => $generatingSections
+                ->pluck('section_title')
+                ->map(fn ($title): string => trim((string) $title))
+                ->filter()
+                ->values()
+                ->take(3)
+                ->all(),
+            'pending_titles' => $pendingSections
+                ->pluck('section_title')
+                ->map(fn ($title): string => trim((string) $title))
+                ->filter()
+                ->values()
+                ->take(3)
+                ->all(),
+        ];
     }
 
     public function analyzeDocuments(): void
@@ -158,7 +219,7 @@ class TenderDetail extends Component
             'documents',
             'extractedCriteria',
             'extractedSpecifications',
-            'technicalMemory',
+            'technicalMemory.sections',
         ]);
     }
 

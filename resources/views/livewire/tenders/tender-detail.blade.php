@@ -215,7 +215,54 @@
                                 </svg>
                                 <p class="text-sm font-medium text-sky-900 dark:text-sky-200">Generando memoria técnica</p>
                             </div>
-                            <p class="mt-2 text-sm text-sky-800 dark:text-sky-300">La IA está redactando la memoria. La vista se actualizará automáticamente cuando termine.</p>
+
+                            @if($this->memoryProgress['has_sections'])
+                                <div class="mt-3 grid grid-cols-2 gap-2">
+                                    <div class="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 dark:border-amber-900/60 dark:bg-amber-950/30">
+                                        <p class="text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">En cola</p>
+                                        <p class="mt-0.5 text-sm font-semibold text-amber-900 dark:text-amber-200">{{ $this->memoryProgress['pending_count'] }}</p>
+                                    </div>
+                                    <div class="rounded-lg border border-sky-200 bg-sky-50 px-2 py-1.5 dark:border-sky-900/60 dark:bg-sky-950/30">
+                                        <p class="text-[10px] font-semibold uppercase tracking-wide text-sky-800 dark:text-sky-300">En curso</p>
+                                        <p class="mt-0.5 text-sm font-semibold text-sky-900 dark:text-sky-200">{{ $this->memoryProgress['generating_count'] }}</p>
+                                    </div>
+                                    <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1.5 dark:border-emerald-900/60 dark:bg-emerald-950/30">
+                                        <p class="text-[10px] font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-300">Completadas</p>
+                                        <p class="mt-0.5 text-sm font-semibold text-emerald-900 dark:text-emerald-200">{{ $this->memoryProgress['completed_count'] }}</p>
+                                    </div>
+                                    <div class="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1.5 dark:border-rose-900/60 dark:bg-rose-950/30">
+                                        <p class="text-[10px] font-semibold uppercase tracking-wide text-rose-800 dark:text-rose-300">Error</p>
+                                        <p class="mt-0.5 text-sm font-semibold text-rose-900 dark:text-rose-200">{{ $this->memoryProgress['failed_count'] }}</p>
+                                    </div>
+                                </div>
+
+                                @if($this->memoryProgress['generating_titles'] !== [])
+                                    <div class="mt-3">
+                                        <p class="text-[11px] font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">Ahora en curso</p>
+                                        <div class="mt-1.5 flex flex-wrap gap-1.5">
+                                            @foreach($this->memoryProgress['generating_titles'] as $sectionTitle)
+                                                <span class="inline-flex items-center rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-medium text-sky-800 dark:bg-sky-900/40 dark:text-sky-200">{{ $sectionTitle }}</span>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @endif
+
+                                @if($this->memoryProgress['pending_titles'] !== [])
+                                    <div class="mt-2">
+                                        <p class="text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">En cola</p>
+                                        <div class="mt-1.5 flex flex-wrap gap-1.5">
+                                            @foreach($this->memoryProgress['pending_titles'] as $sectionTitle)
+                                                <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">{{ $sectionTitle }}</span>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @endif
+
+                                <p class="mt-2 text-sm text-sky-800 dark:text-sky-300">{{ $this->memoryProgress['completed_count'] }}/{{ $this->memoryProgress['total_count'] }} secciones completadas. La vista se actualizará automáticamente.</p>
+                            @else
+                                <p class="mt-2 text-sm text-sky-800 dark:text-sky-300">La IA está preparando las secciones y comenzará la redacción en breve.</p>
+                            @endif
+
                             <a href="{{ route('technical-memories.show', $tender) }}" class="mt-3 inline-flex items-center rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-700">
                                 Ver progreso de la memoria
                             </a>

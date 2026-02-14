@@ -16,23 +16,60 @@
     @else
         <div class="space-y-6">
             @if($isGenerating)
-                <div class="rounded-2xl border border-sky-200 bg-sky-50 p-4 dark:border-sky-900 dark:bg-sky-950/30">
-                    <p class="text-sm font-medium text-sky-900 dark:text-sky-200">Generando memoria técnica por secciones dinámicas de juicio de valor.</p>
-                    @if($view->inProgressSections !== [])
-                        <div class="mt-3 flex flex-wrap items-center gap-2">
-                            <span class="text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">Secciones en generación:</span>
-                            @foreach($view->inProgressSections as $progressSection)
-                                <span class="inline-flex items-center rounded-full bg-sky-100 px-2 py-1 text-xs font-medium text-sky-800 dark:bg-sky-900/40 dark:text-sky-200">
-                                    {{ $progressSection['title'] }}
-                                </span>
-                            @endforeach
+                <div class="rounded-2xl border border-sky-200 bg-gradient-to-r from-sky-50 via-cyan-50 to-white p-4 shadow-sm dark:border-sky-900 dark:from-sky-950/30 dark:via-slate-900 dark:to-slate-900">
+                    <p class="text-sm font-semibold text-sky-900 dark:text-sky-200">Generando memoria técnica por secciones dinámicas de juicio de valor.</p>
+
+                    <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        <div class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-900/60 dark:bg-amber-950/30">
+                            <p class="text-[11px] font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">En cola</p>
+                            <p class="mt-1 text-lg font-semibold text-amber-900 dark:text-amber-200">{{ $view->pendingCount }}</p>
+                        </div>
+                        <div class="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 dark:border-sky-900/60 dark:bg-sky-950/30">
+                            <p class="text-[11px] font-semibold uppercase tracking-wide text-sky-800 dark:text-sky-300">En curso</p>
+                            <p class="mt-1 text-lg font-semibold text-sky-900 dark:text-sky-200">{{ $view->generatingCount }}</p>
+                        </div>
+                        <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-900/60 dark:bg-emerald-950/30">
+                            <p class="text-[11px] font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-300">Completadas</p>
+                            <p class="mt-1 text-lg font-semibold text-emerald-900 dark:text-emerald-200">{{ $view->completedCount }}</p>
+                        </div>
+                        <div class="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 dark:border-rose-900/60 dark:bg-rose-950/30">
+                            <p class="text-[11px] font-semibold uppercase tracking-wide text-rose-800 dark:text-rose-300">Error</p>
+                            <p class="mt-1 text-lg font-semibold text-rose-900 dark:text-rose-200">{{ $view->failedCount }}</p>
+                        </div>
+                    </div>
+
+                    @if($view->generatingSections !== [])
+                        <div class="mt-3">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">Ahora en curso</p>
+                            <div class="mt-2 flex flex-wrap items-center gap-2">
+                                @foreach($view->generatingSections as $progressSection)
+                                    <span class="inline-flex items-center rounded-full bg-sky-100 px-2 py-1 text-xs font-medium text-sky-800 dark:bg-sky-900/40 dark:text-sky-200">
+                                        {{ $progressSection['title'] }}
+                                    </span>
+                                @endforeach
+                            </div>
                         </div>
                     @endif
-                    @if($view->failedSections !== [])
+
+                    @if($view->pendingSections !== [])
+                        <div class="mt-3">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">En cola</p>
+                            <div class="mt-2 flex flex-wrap items-center gap-2">
+                                @foreach($view->pendingSections as $progressSection)
+                                    <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+                                        {{ $progressSection['title'] }}
+                                    </span>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+
+                    @if($view->failedCount > 0)
                         <div class="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300">
                             Hay secciones con error. Puedes regenerarlas individualmente.
                         </div>
                     @endif
+
                     <div class="mt-3">
                         <div class="mb-1 flex items-center justify-between text-xs font-medium text-sky-800 dark:text-sky-200">
                             <span>Progreso de generación</span>
@@ -98,9 +135,20 @@
                         <ul class="mt-3 space-y-2">
                             @foreach($view->sections as $section)
                                 <li>
-                                    <a href="#{{ $section['anchor'] }}" class="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm text-slate-600 transition duration-200 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100">
+                                    <a href="#{{ $section['anchor'] }}" class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-600 transition duration-200 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100">
                                         <span class="min-w-0 truncate">{{ $section['title'] }}</span>
-                                        <span class="shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-800 dark:bg-sky-900/40 dark:text-sky-300">{{ number_format($section['points'], 2, ',', '.') }} pts</span>
+                                        <div class="flex shrink-0 items-center gap-1">
+                                            @if($section['status'] === 'completed')
+                                                <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+                                            @elseif($section['status'] === 'failed')
+                                                <span class="h-2 w-2 rounded-full bg-rose-500"></span>
+                                            @elseif($section['status'] === 'generating')
+                                                <span class="h-2 w-2 animate-pulse rounded-full bg-sky-500"></span>
+                                            @else
+                                                <span class="h-2 w-2 rounded-full bg-amber-500"></span>
+                                            @endif
+                                            <span class="min-w-[7.5ch] rounded-full bg-sky-100 px-2 py-0.5 text-right text-[11px] font-semibold text-sky-800 dark:bg-sky-900/40 dark:text-sky-300">{{ number_format($section['points'], 2, ',', '.') }} pts</span>
+                                        </div>
                                     </a>
                                 </li>
                             @endforeach
@@ -118,8 +166,10 @@
                                         <span class="rounded-full bg-emerald-100 px-2 py-1 font-semibold text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">Completada</span>
                                     @elseif($section['status'] === 'failed')
                                         <span class="rounded-full bg-rose-100 px-2 py-1 font-semibold text-rose-800 dark:bg-rose-900/40 dark:text-rose-300">Error</span>
+                                    @elseif($section['status'] === 'generating')
+                                        <span class="rounded-full bg-sky-100 px-2 py-1 font-semibold text-sky-800 dark:bg-sky-900/40 dark:text-sky-300">En curso</span>
                                     @else
-                                        <span class="rounded-full bg-amber-100 px-2 py-1 font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Generando...</span>
+                                        <span class="rounded-full bg-amber-100 px-2 py-1 font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">En cola</span>
                                     @endif
                                     <span class="rounded-full bg-sky-100 px-2 py-1 font-semibold text-sky-800 dark:bg-sky-900/40 dark:text-sky-300">{{ number_format($section['points'], 2, ',', '.') }} pts</span>
                                     <span class="rounded-full bg-emerald-100 px-2 py-1 font-semibold text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">{{ number_format($section['weight'], 2, ',', '.') }}%</span>
@@ -139,8 +189,10 @@
                             @if($section['content'] === '')
                                 @if($section['status'] === 'failed')
                                     <p class="mt-3 text-sm text-rose-600 dark:text-rose-400">La sección falló durante la generación. Puedes relanzarla con el botón de regenerar.</p>
+                                @elseif($section['status'] === 'generating')
+                                    <p class="mt-3 text-sm text-sky-600 dark:text-sky-400">La IA está redactando esta sección ahora mismo.</p>
                                 @else
-                                    <p class="mt-3 text-sm text-slate-500 dark:text-slate-400">Sección pendiente de generación.</p>
+                                    <p class="mt-3 text-sm text-slate-500 dark:text-slate-400">Sección en cola, pendiente de pasar a generación.</p>
                                 @endif
                             @else
                                 @if($section['evidence'] !== [])

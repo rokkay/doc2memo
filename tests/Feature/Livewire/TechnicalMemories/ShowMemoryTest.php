@@ -87,19 +87,64 @@ it('polls and shows dynamic progress while generation is in draft', function ():
     TechnicalMemorySection::factory()->create([
         'technical_memory_id' => $memory->id,
         'status' => 'completed',
+        'section_title' => 'Resumen ejecutivo',
         'sort_order' => 1,
     ]);
 
     TechnicalMemorySection::factory()->create([
         'technical_memory_id' => $memory->id,
-        'status' => 'pending',
+        'status' => 'generating',
+        'section_title' => 'Metodologia operativa',
         'sort_order' => 2,
+    ]);
+
+    TechnicalMemorySection::factory()->create([
+        'technical_memory_id' => $memory->id,
+        'status' => 'pending',
+        'section_title' => 'Plan de transicion',
+        'sort_order' => 3,
     ]);
 
     Livewire::test(ShowMemory::class, ['tender' => $tender])
         ->assertSee('Generando memoria técnica por secciones dinámicas de juicio de valor.')
-        ->assertSee('1/2')
+        ->assertSee('En cola')
+        ->assertSee('En curso')
+        ->assertSee('Ahora en curso')
+        ->assertSee('Plan de transicion')
+        ->assertSee('Metodologia operativa')
+        ->assertSee('1/3')
         ->assertSeeHtml('wire:poll.2s.visible="refreshMemory"');
+});
+
+it('shows clear per-section state labels for queued and generating sections', function (): void {
+    $tender = Tender::factory()->create();
+    $memory = TechnicalMemory::factory()->create([
+        'tender_id' => $tender->id,
+        'status' => 'draft',
+        'generated_at' => null,
+    ]);
+
+    TechnicalMemorySection::factory()->create([
+        'technical_memory_id' => $memory->id,
+        'section_title' => 'Seccion en cola',
+        'status' => 'pending',
+        'content' => null,
+        'sort_order' => 1,
+    ]);
+
+    TechnicalMemorySection::factory()->create([
+        'technical_memory_id' => $memory->id,
+        'section_title' => 'Seccion en curso',
+        'status' => 'generating',
+        'content' => null,
+        'sort_order' => 2,
+    ]);
+
+    Livewire::test(ShowMemory::class, ['tender' => $tender])
+        ->assertSee('Sección en cola, pendiente de pasar a generación.')
+        ->assertSee('La IA está redactando esta sección ahora mismo.')
+        ->assertSee('Seccion en cola')
+        ->assertSee('Seccion en curso');
 });
 
 it('shows internal operational metrics for the latest run', function (): void {

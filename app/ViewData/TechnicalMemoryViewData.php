@@ -6,15 +6,17 @@ namespace App\ViewData;
 
 use App\Enums\TechnicalMemorySectionStatus;
 use App\Models\Tender;
-use App\Support\TechnicalMemoryMetrics;
 use App\Support\SectionTitleNormalizer;
 use App\Support\TechnicalMemoryMarkdownBuilder;
+use App\Support\TechnicalMemoryMetrics;
 
 final class TechnicalMemoryViewData
 {
     /**
      * @param  array<int,array{id:int,anchor:string,title:string,content:string,points:float,weight:float,criteria_count:int,status:string,evidence:array<int,array{label:string,detail:string,reference:?string}>}>  $sections
      * @param  array<int,array{id:int,anchor:string,title:string,content:string,points:float,weight:float,criteria_count:int,status:string,evidence:array<int,array{label:string,detail:string,reference:?string}>}>  $inProgressSections
+     * @param  array<int,array{id:int,anchor:string,title:string,content:string,points:float,weight:float,criteria_count:int,status:string,evidence:array<int,array{label:string,detail:string,reference:?string}>}>  $pendingSections
+     * @param  array<int,array{id:int,anchor:string,title:string,content:string,points:float,weight:float,criteria_count:int,status:string,evidence:array<int,array{label:string,detail:string,reference:?string}>}>  $generatingSections
      * @param  array<int,array{id:int,anchor:string,title:string,content:string,points:float,weight:float,criteria_count:int,status:string,evidence:array<int,array{label:string,detail:string,reference:?string}>}>  $failedSections
      */
     public function __construct(
@@ -22,7 +24,12 @@ final class TechnicalMemoryViewData
         public readonly bool $isGenerating,
         public readonly array $sections,
         public readonly array $inProgressSections,
+        public readonly array $pendingSections,
+        public readonly array $generatingSections,
         public readonly array $failedSections,
+        public readonly int $pendingCount,
+        public readonly int $generatingCount,
+        public readonly int $failedCount,
         public readonly int $completedCount,
         public readonly int $totalCount,
         public readonly float $totalPoints,
@@ -46,7 +53,12 @@ final class TechnicalMemoryViewData
                 isGenerating: false,
                 sections: [],
                 inProgressSections: [],
+                pendingSections: [],
+                generatingSections: [],
                 failedSections: [],
+                pendingCount: 0,
+                generatingCount: 0,
+                failedCount: 0,
                 completedCount: 0,
                 totalCount: 0,
                 totalPoints: 0.0,
@@ -167,10 +179,24 @@ final class TechnicalMemoryViewData
             static fn (array $section): bool => in_array($section['status'], TechnicalMemorySectionStatus::activeValues(), true),
         ));
 
+        $pendingSections = array_values(array_filter(
+            $sections,
+            static fn (array $section): bool => $section['status'] === TechnicalMemorySectionStatus::Pending->value,
+        ));
+
+        $generatingSections = array_values(array_filter(
+            $sections,
+            static fn (array $section): bool => $section['status'] === TechnicalMemorySectionStatus::Generating->value,
+        ));
+
         $failedSections = array_values(array_filter(
             $sections,
             static fn (array $section): bool => $section['status'] === TechnicalMemorySectionStatus::Failed->value,
         ));
+
+        $pendingCount = count($pendingSections);
+        $generatingCount = count($generatingSections);
+        $failedCount = count($failedSections);
 
         $totalCount = count($sections);
         $totalPoints = array_reduce(
@@ -188,7 +214,12 @@ final class TechnicalMemoryViewData
             isGenerating: $memory->status === 'draft',
             sections: $sections,
             inProgressSections: $inProgressSections,
+            pendingSections: $pendingSections,
+            generatingSections: $generatingSections,
             failedSections: $failedSections,
+            pendingCount: $pendingCount,
+            generatingCount: $generatingCount,
+            failedCount: $failedCount,
             completedCount: $completedCount,
             totalCount: $totalCount,
             totalPoints: $totalPoints,

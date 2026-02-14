@@ -6,6 +6,7 @@ use App\Models\Document;
 use App\Models\ExtractedCriterion;
 use App\Models\ExtractedSpecification;
 use App\Models\TechnicalMemory;
+use App\Models\TechnicalMemorySection;
 use App\Models\Tender;
 use App\Services\DocumentAnalysisService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -224,4 +225,43 @@ it('queues technical memory generation when analysis is complete', function (): 
 
     expect($tender->fresh()->technicalMemory)->not->toBeNull();
     expect($tender->fresh()->technicalMemory->status)->toBe('draft');
+});
+
+it('shows clear memory generation states in actions panel', function (): void {
+    $tender = Tender::factory()->create(['status' => 'completed']);
+    $memory = TechnicalMemory::factory()->create([
+        'tender_id' => $tender->id,
+        'status' => 'draft',
+    ]);
+
+    TechnicalMemorySection::factory()->create([
+        'technical_memory_id' => $memory->id,
+        'section_title' => 'Seccion pendiente',
+        'status' => 'pending',
+        'sort_order' => 1,
+    ]);
+
+    TechnicalMemorySection::factory()->create([
+        'technical_memory_id' => $memory->id,
+        'section_title' => 'Seccion en redaccion',
+        'status' => 'generating',
+        'sort_order' => 2,
+    ]);
+
+    TechnicalMemorySection::factory()->create([
+        'technical_memory_id' => $memory->id,
+        'section_title' => 'Seccion completada',
+        'status' => 'completed',
+        'sort_order' => 3,
+    ]);
+
+    Livewire::test(TenderDetail::class, ['tender' => $tender])
+        ->assertSee('En cola')
+        ->assertSee('En curso')
+        ->assertSee('Completadas')
+        ->assertSee('Error')
+        ->assertSee('Ahora en curso')
+        ->assertSee('Seccion pendiente')
+        ->assertSee('Seccion en redaccion')
+        ->assertSee('1/3 secciones completadas.');
 });
