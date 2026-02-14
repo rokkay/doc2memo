@@ -38,6 +38,9 @@
                 <a href="{{ route('tenders.index') }}" class="rounded-md px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white">
                     Licitaciones
                 </a>
+                <a href="{{ route('technical-memories.operational-metrics') }}" class="rounded-md px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white">
+                    Metricas
+                </a>
                 <a href="{{ route('tenders.create') }}" class="inline-flex cursor-pointer items-center rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-sky-700">
                     Nueva Licitación
                 </a>
