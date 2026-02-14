@@ -3,10 +3,11 @@
 namespace App\Livewire\TechnicalMemories;
 
 use App\Actions\TechnicalMemories\RegenerateSectionAction;
+use App\Models\ExtractedCriterion;
 use App\Models\TechnicalMemorySection;
 use App\Models\Tender;
-use App\Support\SectionTitleNormalizer;
 use App\ViewData\TechnicalMemoryViewData;
+use Illuminate\Support\Collection;
 use Illuminate\View\View;
 use Livewire\Component;
 
@@ -15,11 +16,6 @@ class ShowMemory extends Component
     private RegenerateSectionAction $regenerateSectionAction;
 
     public Tender $tender;
-
-    public string $criteriaPriorityFilter = 'all';
-
-    /** @var array<int,array{section:string,priority:string,points:string}> */
-    public array $matrixRows = [];
 
     public int $judgmentCriteriaCount = 0;
 
@@ -46,48 +42,27 @@ class ShowMemory extends Component
             'pptDocument',
         ]);
 
-        $this->refreshCriteriaMatrix();
+        $this->judgmentCriteriaCount = $this->preferredJudgmentCriteria()->count();
     }
 
-    public function setCriteriaPriorityFilter(string $priority): void
-    {
-        if (! in_array($priority, ['all', 'mandatory', 'preferable', 'optional'], true)) {
-            return;
-        }
-
-        $this->criteriaPriorityFilter = $priority;
-        $this->refreshCriteriaMatrix();
-    }
-
-    private function refreshCriteriaMatrix(): void
+    /**
+     * @return Collection<int,ExtractedCriterion>
+     */
+    private function preferredJudgmentCriteria(): Collection
     {
         $judgmentCriteria = $this->tender->extractedCriteria
             ->where('criterion_type', 'judgment')
             ->values();
 
-        $this->judgmentCriteriaCount = $judgmentCriteria->count();
+        $dedicatedCriteria = $judgmentCriteria
+            ->where('source', 'dedicated_extractor')
+            ->values();
 
-        $rows = $judgmentCriteria
-            ->map(function ($criterion): array {
-                $points = $criterion->score_points !== null
-                    ? number_format((float) $criterion->score_points, 2, ',', '.')
-                    : 'N/D';
-
-                return [
-                    'section' => SectionTitleNormalizer::heading(
-                        $criterion->section_number,
-                        (string) $criterion->section_title,
-                    ),
-                    'priority' => (string) $criterion->priority,
-                    'points' => $points,
-                ];
-            });
-
-        if ($this->criteriaPriorityFilter !== 'all') {
-            $rows = $rows->where('priority', $this->criteriaPriorityFilter);
+        if ($dedicatedCriteria->isNotEmpty()) {
+            return $dedicatedCriteria;
         }
 
-        $this->matrixRows = $rows->values()->all();
+        return $judgmentCriteria;
     }
 
     public function regenerateSection(int $sectionId): void

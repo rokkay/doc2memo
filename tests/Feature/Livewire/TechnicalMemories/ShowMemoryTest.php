@@ -159,7 +159,7 @@ it('shows internal operational metrics for the latest run', function (): void {
         ->assertSee('0,0%');
 });
 
-it('shows judgment matrix and supports priority filters', function (): void {
+it('shows section points integrated in the dynamic index', function (): void {
     $tender = Tender::factory()->create();
     $memory = TechnicalMemory::factory()->create([
         'tender_id' => $tender->id,
@@ -167,43 +167,27 @@ it('shows judgment matrix and supports priority filters', function (): void {
 
     TechnicalMemorySection::factory()->create([
         'technical_memory_id' => $memory->id,
+        'section_title' => 'Metodología',
+        'total_points' => 22,
+        'sort_order' => 1,
         'status' => 'completed',
     ]);
 
-    ExtractedCriterion::factory()->create([
-        'tender_id' => $tender->id,
-        'section_title' => 'Criterio obligatorio UX',
-        'priority' => 'mandatory',
-        'criterion_type' => 'judgment',
-        'score_points' => 22,
-    ]);
-
-    ExtractedCriterion::factory()->create([
-        'tender_id' => $tender->id,
-        'section_title' => 'Criterio opcional UX',
-        'priority' => 'optional',
-        'criterion_type' => 'judgment',
-        'score_points' => 8,
-    ]);
-
-    ExtractedCriterion::factory()->create([
-        'tender_id' => $tender->id,
-        'section_title' => 'Criterio automático precio',
-        'priority' => 'mandatory',
-        'criterion_type' => 'automatic',
-        'score_points' => 40,
+    TechnicalMemorySection::factory()->create([
+        'technical_memory_id' => $memory->id,
+        'section_title' => 'Gobierno del servicio',
+        'total_points' => 8,
+        'sort_order' => 2,
+        'status' => 'completed',
     ]);
 
     Livewire::test(ShowMemory::class, ['tender' => $tender])
-        ->assertSee('Matriz de juicio de valor')
-        ->assertSee('Mostrando 2 de 2 criterios')
-        ->assertSee('Criterio obligatorio UX')
-        ->assertSee('Criterio opcional UX')
-        ->assertDontSee('Criterio automático precio')
-        ->call('setCriteriaPriorityFilter', 'mandatory')
-        ->assertSee('Mostrando 1 de 2 criterios')
-        ->assertSee('Criterio obligatorio UX')
-        ->assertDontSee('Criterio opcional UX');
+        ->assertSee('Índice dinámico')
+        ->assertSee('Metodología')
+        ->assertSee('22,00 pts')
+        ->assertSee('Gobierno del servicio')
+        ->assertSee('8,00 pts')
+        ->assertDontSee('Matriz de juicio de valor');
 });
 
 it('shows empty state when no memory exists', function (): void {
