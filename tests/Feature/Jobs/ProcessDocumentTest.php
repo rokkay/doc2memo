@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Ai\Agents\DocumentAnalyzer;
 use App\Actions\Documents\AnalyzeDocumentWithMetricsAction;
 use App\Jobs\ProcessDocument;
+use App\Listeners\RecordAiUsageFromAgentPrompted;
 use App\Models\Document;
 use App\Models\Tender;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -317,4 +318,54 @@ it('delegates document analysis and keeps persisted analysis cost breakdown keys
     expect($delegate->called)->toBeTrue()
         ->and($processedDocument?->analysis_cost_breakdown)->toBeArray()
         ->and($processedDocument?->analysis_cost_breakdown)->toHaveKeys(['document_analyzer', 'dedicated_judgment_extractor']);
+});
+
+it('stores analyzer token usage metadata and char fallback for document analysis', function (): void {
+    RecordAiUsageFromAgentPrompted::flush();
+
+    Storage::fake('local');
+
+    $tender = Tender::factory()->pending()->create();
+    $filePath = 'documents/'.$tender->id.'/pca.md';
+    Storage::disk('local')->put($filePath, '# PCA');
+
+    $document = Document::factory()->create([
+        'tender_id' => $tender->id,
+        'document_type' => 'pca',
+        'file_path' => $filePath,
+        'mime_type' => 'text/markdown',
+        'status' => 'uploaded',
+    ]);
+
+    RecordAiUsageFromAgentPrompted::recordUsageForAgent(DocumentAnalyzer::class, [
+        'prompt_tokens' => 210,
+        'completion_tokens' => 90,
+    ]);
+
+    DocumentAnalyzer::fake([
+        [
+            'tender_info' => [
+                'title' => 'Servicio Portal Web',
+                'issuing_company' => 'Entidad convocante',
+                'reference_number' => 'EXP-2026-01',
+                'deadline_date' => '15 dias',
+                'description' => 'Contrato de servicios',
+            ],
+            'criteria' => [],
+            'insights' => [],
+        ],
+    ])->preventStrayPrompts();
+
+    (new ProcessDocument($document))->handle();
+
+    $breakdown = $document->fresh()?->analysis_cost_breakdown;
+
+    expect(data_get($breakdown, 'document_analyzer.token_usage.available'))->toBeTrue()
+        ->and((int) data_get($breakdown, 'document_analyzer.token_usage.prompt_tokens'))->toBeGreaterThanOrEqual(0)
+        ->and((int) data_get($breakdown, 'document_analyzer.token_usage.completion_tokens'))->toBeGreaterThanOrEqual(0)
+        ->and(data_get($breakdown, 'dedicated_judgment_extractor.token_usage.available'))->toBeFalse()
+        ->and((int) data_get($breakdown, 'document_analyzer.char_estimate_fallback.input_chars'))->toBeGreaterThan(0)
+        ->and((int) data_get($breakdown, 'dedicated_judgment_extractor.char_estimate_fallback.input_chars'))->toBe(0);
+
+    RecordAiUsageFromAgentPrompted::flush();
 });

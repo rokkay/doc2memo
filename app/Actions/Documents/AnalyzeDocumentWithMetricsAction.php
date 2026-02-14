@@ -8,6 +8,7 @@ use App\Ai\Agents\DocumentAnalyzer;
 use App\Ai\Agents\PcaJudgmentCriteriaExtractorAgent;
 use App\Data\AiAgentRunMetricsData;
 use App\Data\JudgmentCriterionData;
+use App\Listeners\RecordAiUsageFromAgentPrompted;
 use App\Models\Document;
 use App\Support\AiCostBreakdownCalculator;
 use Illuminate\Support\Facades\Log;
@@ -28,17 +29,20 @@ final class AnalyzeDocumentWithMetricsAction
             'input_chars' => max(0, $documentAnalyzer->estimateInputChars($text)),
             'output_chars' => 0,
             'status' => 'pending',
+            'usage' => null,
         ];
         $dedicatedExtractorMetrics = [
             'model_name' => PcaJudgmentCriteriaExtractorAgent::MODEL_NAME,
             'input_chars' => 0,
             'output_chars' => 0,
             'status' => $document->document_type === 'pca' ? 'pending' : 'skipped',
+            'usage' => null,
         ];
 
         $analysis = $documentAnalyzer->analyze($text);
         $analysisAgentMetrics['output_chars'] = $this->estimateSerializedChars($analysis);
         $analysisAgentMetrics['status'] = 'completed';
+        $analysisAgentMetrics['usage'] = RecordAiUsageFromAgentPrompted::pullUsageForAgent(DocumentAnalyzer::class);
 
         $dedicatedCriteria = [];
 
@@ -63,6 +67,30 @@ final class AnalyzeDocumentWithMetricsAction
                 status: $dedicatedExtractorMetrics['status'],
             ),
         ]);
+        $costSummary['breakdown']['document_analyzer']['token_usage'] = [
+            'available' => is_array($analysisAgentMetrics['usage']),
+            'prompt_tokens' => (int) ($analysisAgentMetrics['usage']['prompt_tokens'] ?? 0),
+            'completion_tokens' => (int) ($analysisAgentMetrics['usage']['completion_tokens'] ?? 0),
+            'cache_write_input_tokens' => (int) ($analysisAgentMetrics['usage']['cache_write_input_tokens'] ?? 0),
+            'cache_read_input_tokens' => (int) ($analysisAgentMetrics['usage']['cache_read_input_tokens'] ?? 0),
+            'reasoning_tokens' => (int) ($analysisAgentMetrics['usage']['reasoning_tokens'] ?? 0),
+        ];
+        $costSummary['breakdown']['document_analyzer']['char_estimate_fallback'] = [
+            'input_chars' => $analysisAgentMetrics['input_chars'],
+            'output_chars' => $analysisAgentMetrics['output_chars'],
+        ];
+        $costSummary['breakdown']['dedicated_judgment_extractor']['token_usage'] = [
+            'available' => is_array($dedicatedExtractorMetrics['usage']),
+            'prompt_tokens' => (int) ($dedicatedExtractorMetrics['usage']['prompt_tokens'] ?? 0),
+            'completion_tokens' => (int) ($dedicatedExtractorMetrics['usage']['completion_tokens'] ?? 0),
+            'cache_write_input_tokens' => (int) ($dedicatedExtractorMetrics['usage']['cache_write_input_tokens'] ?? 0),
+            'cache_read_input_tokens' => (int) ($dedicatedExtractorMetrics['usage']['cache_read_input_tokens'] ?? 0),
+            'reasoning_tokens' => (int) ($dedicatedExtractorMetrics['usage']['reasoning_tokens'] ?? 0),
+        ];
+        $costSummary['breakdown']['dedicated_judgment_extractor']['char_estimate_fallback'] = [
+            'input_chars' => $dedicatedExtractorMetrics['input_chars'],
+            'output_chars' => $dedicatedExtractorMetrics['output_chars'],
+        ];
 
         return [
             'analysis' => $analysis,
@@ -92,6 +120,7 @@ final class AnalyzeDocumentWithMetricsAction
             $items = $extractor->extract($sourceText);
             $dedicatedExtractorMetrics['output_chars'] = $this->estimateSerializedChars(['criteria' => $items]);
             $dedicatedExtractorMetrics['status'] = 'completed';
+            $dedicatedExtractorMetrics['usage'] = RecordAiUsageFromAgentPrompted::pullUsageForAgent(PcaJudgmentCriteriaExtractorAgent::class);
 
             return collect($items)
                 ->filter(fn (mixed $item): bool => is_array($item))
@@ -117,6 +146,7 @@ final class AnalyzeDocumentWithMetricsAction
                 ->all();
         } catch (\Throwable $exception) {
             $dedicatedExtractorMetrics['status'] = 'failed';
+            $dedicatedExtractorMetrics['usage'] = RecordAiUsageFromAgentPrompted::pullUsageForAgent(PcaJudgmentCriteriaExtractorAgent::class);
 
             Log::warning('Dedicated judgment criteria extraction failed, using fallback criteria.', [
                 'error' => $exception->getMessage(),

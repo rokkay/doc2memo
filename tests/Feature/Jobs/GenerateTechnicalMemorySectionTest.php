@@ -8,6 +8,7 @@ use App\Data\TechnicalMemoryGenerationContextData;
 use App\Data\TechnicalMemorySectionData;
 use App\Enums\TechnicalMemorySectionStatus;
 use App\Jobs\GenerateTechnicalMemorySection;
+use App\Listeners\RecordAiUsageFromAgentPrompted;
 use App\Models\TechnicalMemory;
 use App\Models\TechnicalMemoryGenerationMetric;
 use App\Models\TechnicalMemoryMetricEvent;
@@ -336,4 +337,80 @@ it('persists skipped style editor metrics and keeps total cost aligned with brea
         ->and(data_get($breakdown, 'style_editor.status'))->toBe('skipped')
         ->and((float) data_get($breakdown, 'style_editor.estimated_cost_usd'))->toBe(0.0)
         ->and((float) $metric?->estimated_cost_usd)->toBe($breakdownTotal);
+});
+
+it('stores token usage metadata when sdk usage is available and keeps char fallback metadata', function (): void {
+    RecordAiUsageFromAgentPrompted::flush();
+
+    $tender = Tender::factory()->create();
+
+    $memory = TechnicalMemory::factory()->create([
+        'tender_id' => $tender->id,
+        'status' => 'draft',
+    ]);
+
+    $section = TechnicalMemorySection::factory()->create([
+        'technical_memory_id' => $memory->id,
+        'section_title' => 'Metodología',
+        'status' => 'pending',
+        'content' => null,
+    ]);
+
+    $richContent = "### Metodología\n\n"
+        .str_repeat('Texto suficiente para superar controles de calidad del flujo de pruebas. ', 18)
+        ."\n\n### Ejecución\n\n"
+        .str_repeat('Se detallan hitos, entregables, seguimiento y evidencias medibles durante el contrato. ', 14);
+
+    RecordAiUsageFromAgentPrompted::recordUsageForAgent(TechnicalMemoryDynamicSectionAgent::class, [
+        'prompt_tokens' => 120,
+        'completion_tokens' => 80,
+    ]);
+    RecordAiUsageFromAgentPrompted::recordUsageForAgent(TechnicalMemorySectionEditorAgent::class, [
+        'prompt_tokens' => 60,
+        'completion_tokens' => 40,
+    ]);
+
+    TechnicalMemoryDynamicSectionAgent::fake([
+        ['content' => $richContent],
+        ['content' => $richContent],
+    ])->preventStrayPrompts();
+
+    TechnicalMemorySectionEditorAgent::fake([
+        ['content' => $richContent],
+    ])->preventStrayPrompts();
+
+    (new GenerateTechnicalMemorySection(
+        technicalMemorySectionId: $section->id,
+        section: TechnicalMemorySectionData::fromArray([
+            'group_key' => '1.1-metodologia',
+            'section_number' => '1.1',
+            'section_title' => 'Metodología',
+            'total_points' => 12,
+            'criteria_count' => 1,
+            'criteria' => [],
+            'sort_key' => '0001.0001|metodologia',
+        ]),
+        context: TechnicalMemoryGenerationContextData::fromArray([
+            'pca' => ['criteria' => []],
+            'ppt' => ['specifications' => []],
+            'memory_title' => 'Memoria test',
+        ]),
+    ))->handle();
+
+    $metric = TechnicalMemoryGenerationMetric::query()
+        ->where('technical_memory_id', $memory->id)
+        ->where('technical_memory_section_id', $section->id)
+        ->latest('id')
+        ->first();
+
+    $breakdown = $metric?->agent_cost_breakdown;
+
+    expect(data_get($breakdown, 'dynamic_section.token_usage.available'))->toBeTrue()
+        ->and((int) data_get($breakdown, 'dynamic_section.token_usage.prompt_tokens'))->toBeGreaterThanOrEqual(0)
+        ->and(data_get($breakdown, 'style_editor.token_usage.available'))->toBeBool()
+        ->and((int) data_get($breakdown, 'style_editor.token_usage.completion_tokens'))->toBeGreaterThanOrEqual(0)
+        ->and((int) data_get($breakdown, 'dynamic_section.char_estimate_fallback.input_chars'))->toBeGreaterThan(0)
+        ->and((int) data_get($breakdown, 'style_editor.char_estimate_fallback.output_chars'))->toBeGreaterThanOrEqual(0);
+
+    RecordAiUsageFromAgentPrompted::flush();
 });

@@ -10,6 +10,7 @@ use App\Data\AiAgentRunMetricsData;
 use App\Data\TechnicalMemoryGenerationContextData;
 use App\Data\TechnicalMemorySectionData;
 use App\Enums\TechnicalMemorySectionStatus;
+use App\Listeners\RecordAiUsageFromAgentPrompted;
 use App\Models\TechnicalMemory;
 use App\Models\TechnicalMemoryGenerationMetric;
 use App\Models\TechnicalMemorySection;
@@ -66,12 +67,14 @@ class GenerateTechnicalMemorySection implements ShouldQueue
             'input_chars' => 0,
             'output_chars' => 0,
             'status' => 'pending',
+            'usage' => null,
         ];
         $styleEditorMetrics = [
             'model_name' => TechnicalMemorySectionEditorAgent::MODEL_NAME,
             'input_chars' => 0,
             'output_chars' => 0,
             'status' => $usedStyleEditor ? 'pending' : 'skipped',
+            'usage' => null,
         ];
         $costBreakdownCalculator = resolve(AiCostBreakdownCalculator::class);
 
@@ -107,6 +110,7 @@ class GenerateTechnicalMemorySection implements ShouldQueue
             $content = $dynamicAgent->generate();
             $dynamicAgentMetrics['output_chars'] = max(0, mb_strlen(trim($content)));
             $dynamicAgentMetrics['status'] = 'completed';
+            $dynamicAgentMetrics['usage'] = RecordAiUsageFromAgentPrompted::pullUsageForAgent(TechnicalMemoryDynamicSectionAgent::class);
 
             if ($usedStyleEditor) {
                 try {
@@ -119,12 +123,14 @@ class GenerateTechnicalMemorySection implements ShouldQueue
                     $editedContent = $styleEditor->edit($content);
                     $styleEditorMetrics['output_chars'] = max(0, mb_strlen(trim($editedContent)));
                     $styleEditorMetrics['status'] = 'completed';
+                    $styleEditorMetrics['usage'] = RecordAiUsageFromAgentPrompted::pullUsageForAgent(TechnicalMemorySectionEditorAgent::class);
 
                     if ($editedContent !== '') {
                         $content = $editedContent;
                     }
                 } catch (Throwable $exception) {
                     $styleEditorMetrics['status'] = 'failed';
+                    $styleEditorMetrics['usage'] = RecordAiUsageFromAgentPrompted::pullUsageForAgent(TechnicalMemorySectionEditorAgent::class);
 
                     Log::warning('Section style editor failed, using raw generated content.', [
                         'technical_memory_section_id' => $section->id,
@@ -425,8 +431,8 @@ class GenerateTechnicalMemorySection implements ShouldQueue
 
     /**
      * @param  array<int,string>  $qualityReasons
-     * @param  array{model_name:string,input_chars:int,output_chars:int,status:string}  $dynamicAgentMetrics
-     * @param  array{model_name:string,input_chars:int,output_chars:int,status:string}  $styleEditorMetrics
+     * @param  array{model_name:string,input_chars:int,output_chars:int,status:string,usage:?array{prompt_tokens:int,completion_tokens:int,cache_write_input_tokens:int,cache_read_input_tokens:int,reasoning_tokens:int}}  $dynamicAgentMetrics
+     * @param  array{model_name:string,input_chars:int,output_chars:int,status:string,usage:?array{prompt_tokens:int,completion_tokens:int,cache_write_input_tokens:int,cache_read_input_tokens:int,reasoning_tokens:int}}  $styleEditorMetrics
      */
     private function persistGenerationMetric(
         TechnicalMemory $memory,
@@ -459,6 +465,31 @@ class GenerateTechnicalMemorySection implements ShouldQueue
                 status: $styleEditorMetrics['status'],
             ),
         ]);
+        $agentCostBreakdown = $costSummary['breakdown'];
+        $agentCostBreakdown['dynamic_section']['token_usage'] = [
+            'available' => is_array($dynamicAgentMetrics['usage']),
+            'prompt_tokens' => (int) ($dynamicAgentMetrics['usage']['prompt_tokens'] ?? 0),
+            'completion_tokens' => (int) ($dynamicAgentMetrics['usage']['completion_tokens'] ?? 0),
+            'cache_write_input_tokens' => (int) ($dynamicAgentMetrics['usage']['cache_write_input_tokens'] ?? 0),
+            'cache_read_input_tokens' => (int) ($dynamicAgentMetrics['usage']['cache_read_input_tokens'] ?? 0),
+            'reasoning_tokens' => (int) ($dynamicAgentMetrics['usage']['reasoning_tokens'] ?? 0),
+        ];
+        $agentCostBreakdown['dynamic_section']['char_estimate_fallback'] = [
+            'input_chars' => $dynamicAgentMetrics['input_chars'],
+            'output_chars' => $dynamicAgentMetrics['output_chars'],
+        ];
+        $agentCostBreakdown['style_editor']['token_usage'] = [
+            'available' => is_array($styleEditorMetrics['usage']),
+            'prompt_tokens' => (int) ($styleEditorMetrics['usage']['prompt_tokens'] ?? 0),
+            'completion_tokens' => (int) ($styleEditorMetrics['usage']['completion_tokens'] ?? 0),
+            'cache_write_input_tokens' => (int) ($styleEditorMetrics['usage']['cache_write_input_tokens'] ?? 0),
+            'cache_read_input_tokens' => (int) ($styleEditorMetrics['usage']['cache_read_input_tokens'] ?? 0),
+            'reasoning_tokens' => (int) ($styleEditorMetrics['usage']['reasoning_tokens'] ?? 0),
+        ];
+        $agentCostBreakdown['style_editor']['char_estimate_fallback'] = [
+            'input_chars' => $styleEditorMetrics['input_chars'],
+            'output_chars' => $styleEditorMetrics['output_chars'],
+        ];
 
         TechnicalMemoryGenerationMetric::query()->create([
             'technical_memory_id' => $memory->id,
@@ -474,7 +505,7 @@ class GenerateTechnicalMemorySection implements ShouldQueue
             'estimated_input_units' => $costSummary['estimated_input_units'],
             'estimated_output_units' => $costSummary['estimated_output_units'],
             'estimated_cost_usd' => $costSummary['estimated_cost_usd'],
-            'agent_cost_breakdown' => $costSummary['breakdown'],
+            'agent_cost_breakdown' => $agentCostBreakdown,
         ]);
     }
 }
