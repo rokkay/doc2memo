@@ -4,35 +4,40 @@ declare(strict_types=1);
 
 namespace App\Actions\Tenders;
 
+use App\Data\JudgmentCriterionData;
+use App\Data\TechnicalMemoryGenerationContextData;
+use App\Data\TechnicalMemorySectionData;
+use App\Enums\TechnicalMemorySectionStatus;
 use App\Jobs\GenerateTechnicalMemorySection;
+use App\Models\ExtractedCriterion;
+use App\Models\TechnicalMemorySection;
 use App\Models\Tender;
-use App\Support\TechnicalMemorySections;
+use App\Support\JudgmentCriteriaParser;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 final class GenerateTechnicalMemoryAction
 {
+    private JudgmentCriteriaParser $judgmentCriteriaParser;
+
+    public function __construct(?JudgmentCriteriaParser $judgmentCriteriaParser = null)
+    {
+        $this->judgmentCriteriaParser = $judgmentCriteriaParser ?? new JudgmentCriteriaParser;
+    }
+
     public function __invoke(Tender $tender): void
     {
-        $criteria = $tender->extractedCriteria()
+        $rawJudgmentCriteria = $tender->judgmentCriteria()
             ->orderBy('id')
             ->get();
 
+        $criteria = $this->expandCriteriaForGrouping($rawJudgmentCriteria);
+
+        $sectionGroups = $this->buildSectionGroups($criteria);
+
         $pcaData = [
             'criteria' => $criteria
-                ->map(fn ($item) => [
-                    'section_number' => $item->section_number,
-                    'section_title' => $item->section_title,
-                    'description' => $item->description,
-                    'priority' => $item->priority,
-                    'metadata' => $item->metadata,
-                ])
-                ->all(),
-            'evaluation_points' => $criteria
-                ->map(fn ($item) => [
-                    'section_number' => $item->section_number,
-                    'section_title' => $item->section_title,
-                    'priority' => $item->priority,
-                    'points' => $this->extractEvaluationPoints((string) $item->description, is_array($item->metadata) ? $item->metadata : []),
-                ])
+                ->map(fn (JudgmentCriterionData $item): array => $item->toArray())
                 ->all(),
             'insights' => $tender->documentInsights()
                 ->where('document_id', optional($tender->pcaDocument)->id)
@@ -79,76 +84,166 @@ final class GenerateTechnicalMemoryAction
                 ->all(),
         ];
 
+        $generationContext = new TechnicalMemoryGenerationContextData(
+            pca: $pcaData,
+            ppt: $pptData,
+            memoryTitle: (string) ('Memoria Técnica - '.$tender->title),
+        );
+
         $memory = $tender->technicalMemory()->updateOrCreate(
             ['tender_id' => $tender->id],
             [
                 'title' => 'Memoria Técnica - '.$tender->title,
-                'introduction' => null,
-                'company_presentation' => null,
-                'technical_approach' => null,
-                'methodology' => null,
-                'team_structure' => null,
-                'timeline' => null,
-                'timeline_plan' => null,
-                'quality_assurance' => null,
-                'risk_management' => null,
-                'compliance_matrix' => null,
                 'status' => 'draft',
                 'generated_file_path' => null,
                 'generated_at' => null,
             ]
         );
 
-        foreach (TechnicalMemorySections::fields() as $sectionField) {
+        $memory->sections()->delete();
+
+        if ($sectionGroups->isEmpty()) {
+            $memory->update([
+                'status' => 'generated',
+                'generated_at' => now(),
+            ]);
+
+            return;
+        }
+
+        $totalPoints = (float) $sectionGroups->sum(fn (TechnicalMemorySectionData $group): float => $group->totalPoints);
+
+        foreach ($sectionGroups->values() as $index => $group) {
+            /** @var TechnicalMemorySectionData $group */
+            $weightPercent = $totalPoints > 0
+                ? round(($group->totalPoints / $totalPoints) * 100, 2)
+                : 0.0;
+
+            $section = TechnicalMemorySection::query()->create([
+                'technical_memory_id' => $memory->id,
+                'group_key' => $group->groupKey,
+                'section_number' => $group->sectionNumber,
+                'section_title' => $group->sectionTitle,
+                'total_points' => round($group->totalPoints, 2),
+                'weight_percent' => $weightPercent,
+                'criteria_count' => $group->criteriaCount,
+                'sort_order' => $index + 1,
+                'status' => TechnicalMemorySectionStatus::Pending,
+            ]);
+
             GenerateTechnicalMemorySection::dispatch(
-                technicalMemoryId: $memory->id,
-                section: $sectionField,
-                pcaData: $pcaData,
-                pptData: $pptData,
+                technicalMemorySectionId: $section->id,
+                section: $group,
+                context: $generationContext,
             );
         }
     }
 
     /**
-     * @param  array<string,mixed>  $metadata
-     * @return array<int,string>
+     * @param  Collection<int,JudgmentCriterionData>  $criteria
+     * @return Collection<int,TechnicalMemorySectionData>
      */
-    private function extractEvaluationPoints(string $description, array $metadata): array
+    private function buildSectionGroups(Collection $criteria): Collection
     {
-        $metadataPoints = collect([
-            $metadata['evaluation_points'] ?? null,
-            $metadata['criteria_points'] ?? null,
-            $metadata['scoring_points'] ?? null,
-            $metadata['puntos_evaluacion'] ?? null,
-            $metadata['points'] ?? null,
-        ])
-            ->flatten(1)
-            ->map(fn (mixed $point): string => trim((string) $point))
-            ->filter(fn (string $point): bool => $point !== '')
-            ->values();
+        return $criteria
+            ->groupBy(fn (JudgmentCriterionData $criterion): string => $this->groupKey($criterion))
+            ->map(function (Collection $items, string $groupKey): TechnicalMemorySectionData {
+                /** @var JudgmentCriterionData $first */
+                $first = $items->first();
 
-        if ($metadataPoints->isNotEmpty()) {
-            return $metadataPoints->take(8)->all();
-        }
+                $sectionNumber = (string) ($first->sectionNumber ?? '');
+                $sectionTitle = trim($first->sectionTitle);
 
-        $text = str_replace(["\r\n", "\r"], "\n", $description);
-
-        $points = collect(preg_split('/\n+|\s*;\s*/', $text) ?: [])
-            ->map(function (string $segment): string {
-                $segment = trim($segment);
-                $segment = preg_replace('/^[-*]\s+/', '', $segment) ?? $segment;
-                $segment = preg_replace('/^\d+[\)\.-]?\s+/', '', $segment) ?? $segment;
-
-                return trim($segment);
+                return new TechnicalMemorySectionData(
+                    groupKey: $groupKey,
+                    sectionNumber: $sectionNumber !== '' ? $sectionNumber : null,
+                    sectionTitle: $sectionTitle !== '' ? $sectionTitle : 'Sin sección',
+                    totalPoints: (float) $items->sum(fn (JudgmentCriterionData $item): float => $item->scorePoints ?? 0.0),
+                    criteriaCount: $items->count(),
+                    criteria: $items->values()->all(),
+                    sortKey: $this->sortKey($sectionNumber, $sectionTitle),
+                );
             })
-            ->filter(fn (string $segment): bool => $segment !== '')
-            ->unique()
+            ->sortBy(fn (TechnicalMemorySectionData $group): string => $group->sortKey)
             ->values();
+    }
 
-        if ($points->isEmpty()) {
-            return [$description];
+    private function groupKey(JudgmentCriterionData $criterion): string
+    {
+        $stored = trim($criterion->groupKey);
+
+        if ($stored !== '') {
+            return $stored;
         }
 
-        return $points->take(8)->all();
+        return $this->judgmentCriteriaParser->buildGroupKey(
+            $criterion->sectionNumber,
+            $criterion->sectionTitle,
+        );
+    }
+
+    /**
+     * @return Collection<int,JudgmentCriterionData>
+     */
+    private function expandCriteriaForGrouping(Collection $criteria): Collection
+    {
+        return $criteria->flatMap(function (ExtractedCriterion $criterion): array {
+            $criterionData = JudgmentCriterionData::fromModel($criterion);
+
+            if ($this->judgmentCriteriaParser->hasExplicitSubcriterionNumber($criterionData->sectionNumber)) {
+                return [$criterionData];
+            }
+
+            $subcriteria = $this->judgmentCriteriaParser->expandGroupedJudgmentCriterion(
+                description: (string) $criterion->description,
+                totalJudgmentPoints: $criterion->score_points !== null ? (float) $criterion->score_points : null,
+            );
+
+            if ($subcriteria === []) {
+                return [$criterionData];
+            }
+
+            return collect($subcriteria)
+                ->map(function (array $subcriterion) use ($criterionData): JudgmentCriterionData {
+                    $sectionNumber = $subcriterion['section_number'];
+                    $sectionTitle = $subcriterion['section_title'];
+                    $scorePoints = $subcriterion['score_points'];
+
+                    $normalizedNumber = $sectionNumber !== '' ? $sectionNumber : $criterionData->sectionNumber;
+                    $normalizedTitle = $sectionTitle !== '' ? $sectionTitle : $criterionData->sectionTitle;
+
+                    return JudgmentCriterionData::fromArray([
+                        'section_number' => $normalizedNumber,
+                        'section_title' => $normalizedTitle,
+                        'description' => $normalizedTitle !== '' ? $normalizedTitle : $criterionData->description,
+                        'priority' => $criterionData->priority,
+                        'criterion_type' => $criterionData->criterionType,
+                        'score_points' => $scorePoints,
+                        'group_key' => $this->judgmentCriteriaParser->buildGroupKey($normalizedNumber, $normalizedTitle),
+                        'metadata' => $criterionData->metadata,
+                    ]);
+                })
+                ->values()
+                ->all();
+        })->values();
+    }
+
+    private function sortKey(?string $sectionNumber, string $sectionTitle): string
+    {
+        $number = trim((string) $sectionNumber);
+
+        if ($number !== '') {
+            $segments = collect(explode('.', $number))
+                ->map(function (string $segment): string {
+                    $numeric = preg_replace('/[^0-9]/', '', $segment) ?? '';
+
+                    return str_pad($numeric !== '' ? $numeric : '0', 4, '0', STR_PAD_LEFT);
+                })
+                ->implode('.');
+
+            return $segments.'|'.Str::lower($sectionTitle);
+        }
+
+        return '9999|'.Str::lower($sectionTitle);
     }
 }

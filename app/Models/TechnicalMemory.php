@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TechnicalMemory extends Model
 {
@@ -13,16 +14,6 @@ class TechnicalMemory extends Model
     protected $fillable = [
         'tender_id',
         'title',
-        'introduction',
-        'company_presentation',
-        'technical_approach',
-        'methodology',
-        'team_structure',
-        'timeline',
-        'timeline_plan',
-        'quality_assurance',
-        'risk_management',
-        'compliance_matrix',
         'status',
         'generated_file_path',
         'generated_at',
@@ -32,7 +23,6 @@ class TechnicalMemory extends Model
     {
         return [
             'generated_at' => 'datetime',
-            'timeline_plan' => 'array',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
@@ -41,5 +31,12 @@ class TechnicalMemory extends Model
     public function tender(): BelongsTo
     {
         return $this->belongsTo(Tender::class);
+    }
+
+    public function sections(): HasMany
+    {
+        return $this->hasMany(TechnicalMemorySection::class)
+            ->orderBy('sort_order')
+            ->orderBy('id');
     }
 }

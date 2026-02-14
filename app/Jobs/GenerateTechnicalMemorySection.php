@@ -2,47 +2,114 @@
 
 namespace App\Jobs;
 
-use App\Models\TechnicalMemory;
-use App\Support\TechnicalMemorySections;
+use App\Ai\Agents\TechnicalMemoryDynamicSectionAgent;
+use App\Ai\Agents\TechnicalMemorySectionEditorAgent;
+use App\Data\TechnicalMemoryGenerationContextData;
+use App\Data\TechnicalMemorySectionData;
+use App\Enums\TechnicalMemorySectionStatus;
+use App\Models\TechnicalMemorySection;
+use App\Support\TechnicalMemorySectionQualityGate;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class GenerateTechnicalMemorySection implements ShouldQueue
 {
     use Queueable;
 
-    /**
-     * @param  array<string,mixed>  $pcaData
-     * @param  array<string,mixed>  $pptData
-     */
     public function __construct(
-        public int $technicalMemoryId,
-        public string $section,
-        public array $pcaData,
-        public array $pptData,
+        public int $technicalMemorySectionId,
+        public TechnicalMemorySectionData $section,
+        public TechnicalMemoryGenerationContextData $context,
+        public int $qualityAttempt = 0,
     ) {}
 
     public function handle(): void
     {
-        if (! TechnicalMemorySections::isSupported($this->section)) {
+        $section = TechnicalMemorySection::query()
+            ->with('technicalMemory')
+            ->find($this->technicalMemorySectionId);
+
+        if (! $section || ! $section->technicalMemory) {
             return;
         }
 
-        $memory = TechnicalMemory::query()->find($this->technicalMemoryId);
+        $memory = $section->technicalMemory;
 
-        if (! $memory) {
-            return;
-        }
-
-        $agentClass = TechnicalMemorySections::agentClass($this->section);
-        $sectionData = (new $agentClass($this->pcaData, $this->pptData))->generate();
-
-        $memory->update([
-            $this->section => $sectionData['content'],
-            'timeline_plan' => $this->section === 'timeline'
-                ? $sectionData['timeline_plan']
-                : $memory->timeline_plan,
+        $section->update([
+            'status' => TechnicalMemorySectionStatus::Generating,
+            'error_message' => null,
         ]);
+
+        try {
+            $qualityGate = new TechnicalMemorySectionQualityGate;
+
+            $content = (new TechnicalMemoryDynamicSectionAgent(
+                section: $this->section->toArray(),
+                context: $this->context->toArray(),
+            ))->generate();
+
+            try {
+                $editedContent = (new TechnicalMemorySectionEditorAgent(
+                    section: $this->section->toArray(),
+                ))->edit($content);
+
+                if ($editedContent !== '') {
+                    $content = $editedContent;
+                }
+            } catch (Throwable $exception) {
+                Log::warning('Section style editor failed, using raw generated content.', [
+                    'technical_memory_section_id' => $section->id,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+
+            $medianCompletedLength = $this->medianCompletedSectionLength($memory->id, $section->id);
+            $qualityCheck = $qualityGate->evaluate($content, $medianCompletedLength);
+
+            if (! $qualityCheck['passes']) {
+                $qualityFeedback = implode(' ', $qualityCheck['reasons']);
+
+                $maxRetryAttempts = (int) config('technical_memory.quality_gate.max_retry_attempts', 1);
+
+                if ($this->qualityAttempt < $maxRetryAttempts) {
+                    $section->update([
+                        'status' => TechnicalMemorySectionStatus::Pending,
+                        'error_message' => $qualityFeedback,
+                    ]);
+
+                    self::dispatch(
+                        technicalMemorySectionId: $this->technicalMemorySectionId,
+                        section: $this->section,
+                        context: $this->context->withQualityFeedback($qualityFeedback),
+                        qualityAttempt: $this->qualityAttempt + 1,
+                    );
+
+                    return;
+                }
+
+                $section->update([
+                    'status' => TechnicalMemorySectionStatus::Failed,
+                    'error_message' => $qualityFeedback,
+                ]);
+
+                return;
+            }
+
+            $section->update([
+                'status' => TechnicalMemorySectionStatus::Completed,
+                'content' => $content,
+                'error_message' => null,
+            ]);
+        } catch (Throwable $exception) {
+            $section->update([
+                'status' => TechnicalMemorySectionStatus::Failed,
+                'error_message' => $exception->getMessage(),
+            ]);
+
+            throw $exception;
+        }
 
         $memory = $memory->fresh();
 
@@ -50,13 +117,43 @@ class GenerateTechnicalMemorySection implements ShouldQueue
             return;
         }
 
-        if (TechnicalMemorySections::completedCount($memory) < count(TechnicalMemorySections::fields())) {
-            return;
+        $pendingSections = $memory->sections()
+            ->whereIn('status', TechnicalMemorySectionStatus::blockingValues())
+            ->exists();
+
+        if (! $pendingSections) {
+            $memory->update([
+                'status' => 'generated',
+                'generated_at' => now(),
+            ]);
+        }
+    }
+
+    private function medianCompletedSectionLength(int $memoryId, int $excludeSectionId): ?int
+    {
+        $lengths = TechnicalMemorySection::query()
+            ->where('technical_memory_id', $memoryId)
+            ->where('id', '!=', $excludeSectionId)
+            ->where('status', TechnicalMemorySectionStatus::Completed->value)
+            ->whereNotNull('content')
+            ->pluck('content')
+            ->map(fn (string $content): int => mb_strlen(trim($content)))
+            ->filter(fn (int $length): bool => $length > 0)
+            ->sort()
+            ->values();
+
+        $count = $lengths->count();
+
+        if ($count === 0) {
+            return null;
         }
 
-        $memory->update([
-            'status' => 'generated',
-            'generated_at' => now(),
-        ]);
+        $middle = intdiv($count, 2);
+
+        if ($count % 2 === 0) {
+            return (int) round(($lengths[$middle - 1] + $lengths[$middle]) / 2);
+        }
+
+        return $lengths[$middle];
     }
 }

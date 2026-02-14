@@ -5,16 +5,28 @@ declare(strict_types=1);
 namespace App\Actions\Documents;
 
 use App\Ai\Agents\DocumentAnalyzer;
+use App\Ai\Agents\PcaJudgmentCriteriaExtractorAgent;
+use App\Data\JudgmentCriterionData;
 use App\Models\Document;
 use App\Models\DocumentInsight;
 use App\Models\ExtractedCriterion;
 use App\Models\ExtractedSpecification;
+use App\Support\JudgmentCriteriaParser;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Smalot\PdfParser\Parser;
 
 final class ProcessDocumentAction
 {
+    private JudgmentCriteriaParser $judgmentCriteriaParser;
+
+    public function __construct(?JudgmentCriteriaParser $judgmentCriteriaParser = null)
+    {
+        $this->judgmentCriteriaParser = $judgmentCriteriaParser ?? new JudgmentCriteriaParser;
+    }
+
     public function __invoke(Document $document): void
     {
         $document->update([
@@ -30,11 +42,11 @@ final class ProcessDocumentAction
 
         $analysis = $this->analyzeText($document->document_type, $text);
 
-        DB::transaction(function () use ($document, $analysis): void {
+        DB::transaction(function () use ($document, $analysis, $text): void {
             $this->clearPreviousExtractions($document);
 
             if ($document->document_type === 'pca') {
-                $this->storePcaData($document, $analysis);
+                $this->storePcaData($document, $analysis, $text);
             }
 
             if ($document->document_type === 'ppt') {
@@ -81,7 +93,7 @@ final class ProcessDocumentAction
         $document->insights()->delete();
     }
 
-    private function storePcaData(Document $document, array $analysis): void
+    private function storePcaData(Document $document, array $analysis, string $sourceText): void
     {
         $tenderInfo = $analysis['tender_info'] ?? [];
 
@@ -104,17 +116,174 @@ final class ProcessDocumentAction
             $document->unsetRelation('tender');
         }
 
-        foreach (($analysis['criteria'] ?? []) as $criterion) {
-            ExtractedCriterion::query()->create([
-                'tender_id' => $document->tender_id,
-                'document_id' => $document->id,
+        $criteria = is_array($analysis['criteria'] ?? null) ? $analysis['criteria'] : [];
+        $dedicatedJudgmentCriteria = $this->extractDedicatedJudgmentCriteria($sourceText, $criteria);
+
+        foreach ($criteria as $criterion) {
+            $criterionType = $this->normalizeCriterionType(
+                type: $criterion['criterion_type'] ?? null,
+                sectionTitle: (string) ($criterion['section_title'] ?? ''),
+                description: (string) ($criterion['description'] ?? ''),
+            );
+
+            $normalizedCriterion = JudgmentCriterionData::fromArray([
                 'section_number' => $criterion['section_number'] ?? null,
                 'section_title' => (string) ($criterion['section_title'] ?? 'Sin sección'),
                 'description' => (string) ($criterion['description'] ?? ''),
                 'priority' => (string) ($criterion['priority'] ?? 'mandatory'),
-                'metadata' => $criterion['metadata'] ?? null,
+                'criterion_type' => $criterionType,
+                'score_points' => $criterion['score_points'] ?? null,
+                'metadata' => is_array($criterion['metadata'] ?? null) ? $criterion['metadata'] : null,
             ]);
+
+            $expandedCriteria = $this->expandJudgmentSubcriteria($normalizedCriterion);
+            $criteriaToPersist = $expandedCriteria !== [] ? $expandedCriteria : [$normalizedCriterion];
+
+            foreach ($criteriaToPersist as $criterionItem) {
+                $sectionNumber = $criterionItem->sectionNumber;
+                $sectionTitle = $criterionItem->sectionTitle;
+
+                ExtractedCriterion::query()->create([
+                    'tender_id' => $document->tender_id,
+                    'document_id' => $document->id,
+                    'section_number' => $sectionNumber,
+                    'section_title' => $sectionTitle,
+                    'description' => $criterionItem->description,
+                    'priority' => $criterionItem->priority,
+                    'criterion_type' => $criterionItem->criterionType,
+                    'score_points' => $this->extractScorePoints(
+                        scorePoints: $criterionItem->scorePoints,
+                        description: $criterionItem->description,
+                        metadata: $criterionItem->metadata ?? [],
+                    ),
+                    'group_key' => $this->buildGroupKey(
+                        sectionNumber: $sectionNumber,
+                        sectionTitle: $sectionTitle,
+                    ),
+                    'metadata' => $criterionItem->metadata,
+                ]);
+            }
         }
+
+        foreach ($dedicatedJudgmentCriteria as $criterionItem) {
+            $groupKey = $this->buildGroupKey(
+                sectionNumber: $criterionItem->sectionNumber,
+                sectionTitle: $criterionItem->sectionTitle,
+            );
+
+            ExtractedCriterion::query()->updateOrCreate(
+                [
+                    'document_id' => $document->id,
+                    'criterion_type' => 'judgment',
+                    'group_key' => $groupKey,
+                ],
+                [
+                    'tender_id' => $document->tender_id,
+                    'section_number' => $criterionItem->sectionNumber,
+                    'section_title' => $criterionItem->sectionTitle,
+                    'description' => $criterionItem->description,
+                    'priority' => $criterionItem->priority,
+                    'score_points' => $this->extractScorePoints(
+                        scorePoints: $criterionItem->scorePoints,
+                        description: $criterionItem->description,
+                        metadata: $criterionItem->metadata ?? [],
+                    ),
+                    'metadata' => $criterionItem->metadata,
+                ],
+            );
+        }
+    }
+
+    /**
+     * @param  array<int,mixed>  $criteria
+     * @return array<int,JudgmentCriterionData>
+     */
+    private function extractDedicatedJudgmentCriteria(string $sourceText, array $criteria): array
+    {
+        if (! $this->shouldRunDedicatedJudgmentExtractor($criteria)) {
+            return [];
+        }
+
+        try {
+            $items = (new PcaJudgmentCriteriaExtractorAgent)->extract($sourceText);
+
+            return collect($items)
+                ->filter(fn (mixed $item): bool => is_array($item))
+                ->map(fn (array $item): JudgmentCriterionData => JudgmentCriterionData::fromArray([
+                    'section_number' => $item['section_number'] ?? null,
+                    'section_title' => $item['section_title'] ?? 'Sin sección',
+                    'description' => $item['description'] ?? '',
+                    'priority' => $item['priority'] ?? 'mandatory',
+                    'criterion_type' => 'judgment',
+                    'score_points' => $item['score_points'] ?? null,
+                    'group_key' => '',
+                    'metadata' => is_array($item['metadata'] ?? null) ? $item['metadata'] : null,
+                ]))
+                ->filter(fn (JudgmentCriterionData $item): bool => $item->sectionTitle !== '' && $item->description !== '')
+                ->values()
+                ->all();
+        } catch (\Throwable $exception) {
+            Log::warning('Dedicated judgment criteria extraction failed, using fallback criteria.', [
+                'error' => $exception->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
+    /**
+     * @param  array<int,mixed>  $criteria
+     */
+    private function shouldRunDedicatedJudgmentExtractor(array $criteria): bool
+    {
+        return collect($criteria)
+            ->filter(fn (mixed $criterion): bool => is_array($criterion))
+            ->contains(function (array $criterion): bool {
+                $content = Str::of(
+                    (string) ($criterion['section_number'] ?? '')
+                    .' '.(string) ($criterion['section_title'] ?? '')
+                    .' '.(string) ($criterion['description'] ?? '')
+                )->lower()->toString();
+
+                return preg_match('/juicio\s+de\s+valor|sobre\s*b|criterios?\s+b/u', $content) === 1;
+            });
+    }
+
+    /**
+     * @return array<int,JudgmentCriterionData>
+     */
+    private function expandJudgmentSubcriteria(JudgmentCriterionData $criterion): array
+    {
+        if ($criterion->criterionType !== 'judgment') {
+            return [];
+        }
+
+        if ($this->judgmentCriteriaParser->hasExplicitSubcriterionNumber($criterion->sectionNumber)) {
+            return [];
+        }
+
+        $subcriteria = $this->judgmentCriteriaParser->expandGroupedJudgmentCriterion(
+            description: $criterion->description,
+            totalJudgmentPoints: $criterion->scorePoints,
+        );
+
+        if ($subcriteria === []) {
+            return [];
+        }
+
+        return collect($subcriteria)
+            ->map(function (array $subcriterion) use ($criterion): JudgmentCriterionData {
+                return JudgmentCriterionData::fromArray([
+                    'section_number' => $subcriterion['section_number'] !== '' ? $subcriterion['section_number'] : $criterion->sectionNumber,
+                    'section_title' => $subcriterion['section_title'] !== '' ? $subcriterion['section_title'] : $criterion->sectionTitle,
+                    'description' => $subcriterion['section_title'] !== '' ? $subcriterion['section_title'] : $criterion->description,
+                    'priority' => $criterion->priority,
+                    'criterion_type' => 'judgment',
+                    'score_points' => $subcriterion['score_points'],
+                    'metadata' => $criterion->metadata,
+                ]);
+            })
+            ->all();
     }
 
     private function storePptData(Document $document, array $analysis): void
@@ -172,5 +341,96 @@ final class ProcessDocumentAction
         }
 
         $tender->update(['status' => 'completed']);
+    }
+
+    /**
+     * @param  array<string,mixed>  $metadata
+     */
+    private function extractScorePoints(mixed $scorePoints, string $description, array $metadata): ?float
+    {
+        $normalizedScore = $this->parseNumericValue($scorePoints);
+
+        if ($normalizedScore !== null) {
+            return $normalizedScore;
+        }
+
+        $metadataScore = collect([
+            $metadata['score_points'] ?? null,
+            $metadata['points'] ?? null,
+            $metadata['puntos'] ?? null,
+            $metadata['puntuacion'] ?? null,
+            $metadata['puntuación'] ?? null,
+            $metadata['max_points'] ?? null,
+            $metadata['max_puntos'] ?? null,
+            $metadata['weight_points'] ?? null,
+        ])
+            ->map(fn (mixed $value): ?float => $this->parseNumericValue($value))
+            ->first(fn (?float $value): bool => $value !== null);
+
+        if ($metadataScore !== null) {
+            return $metadataScore;
+        }
+
+        if (preg_match('/(?:hasta\s+)?(\d+(?:[\.,]\d+)?)\s*(?:puntos?|pts?\.?)/iu', $description, $matches) === 1) {
+            return $this->parseNumericValue($matches[1]);
+        }
+
+        return null;
+    }
+
+    private function normalizeCriterionType(mixed $type, string $sectionTitle, string $description): string
+    {
+        $normalizedType = Str::of((string) $type)->trim()->lower()->toString();
+        $source = Str::of($sectionTitle.' '.$description)->lower()->toString();
+
+        if (preg_match('/condiciones\s+especiales\s+de\s+ejecuci[oó]n|art\.\s*202\s*lcsp|subcontratistas|igualdad\s+de\s+remuneraci[oó]n/u', $source) === 1) {
+            return 'automatic';
+        }
+
+        if (preg_match('/criterios?\s+b\s*\(?juicio\s+de\s+valor\)?|sobre\s*b|juicio\s+de\s+valor/u', $source) === 1) {
+            return 'judgment';
+        }
+
+        if (in_array($normalizedType, ['judgment', 'automatic'], true)) {
+            return $normalizedType;
+        }
+
+        if (preg_match('/juicio\s+de\s+valor/u', $source) === 1) {
+            return 'judgment';
+        }
+
+        if (preg_match('/autom[aá]tic|f[oó]rmula|precio|coste|horas/u', $source) === 1) {
+            return 'automatic';
+        }
+
+        return 'judgment';
+    }
+
+    private function buildGroupKey(?string $sectionNumber, string $sectionTitle): string
+    {
+        return $this->judgmentCriteriaParser->buildGroupKey($sectionNumber, $sectionTitle);
+    }
+
+    private function parseNumericValue(mixed $value): ?float
+    {
+        if (is_int($value) || is_float($value)) {
+            return (float) $value;
+        }
+
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $normalized = str_replace(',', '.', trim($value));
+
+        if ($normalized === '') {
+            return null;
+        }
+
+        if (preg_match('/-?\d+(?:\.\d+)?/', $normalized, $matches) !== 1) {
+            return null;
+        }
+
+        return (float) $matches[0];
     }
 }

@@ -38,6 +38,11 @@ class Tender extends Model
         return $this->hasMany(ExtractedCriterion::class);
     }
 
+    public function judgmentCriteria(): HasMany
+    {
+        return $this->extractedCriteria()->judgment();
+    }
+
     public function extractedSpecifications(): HasMany
     {
         return $this->hasMany(ExtractedSpecification::class);

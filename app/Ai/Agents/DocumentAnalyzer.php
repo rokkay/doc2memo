@@ -66,6 +66,8 @@ INSTRUCTIONS;
                         'section_title' => $schema->string()->required(),
                         'description' => $schema->string()->required(),
                         'priority' => $schema->string()->enum(['mandatory', 'preferable', 'optional'])->required(),
+                        'criterion_type' => $schema->string()->enum(['judgment', 'automatic'])->required(),
+                        'score_points' => $schema->string()->required(),
                         'metadata' => $schema->object()->withoutAdditionalProperties(),
                     ])->withoutAdditionalProperties())
                     ->required(),

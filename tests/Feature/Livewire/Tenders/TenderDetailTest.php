@@ -116,7 +116,6 @@ it('can regenerate existing technical memory and reset sections', function (): v
         'tender_id' => $tender->id,
         'status' => 'generated',
         'generated_at' => now(),
-        'introduction' => 'Contenido previo',
         'generated_file_path' => 'technical-memories/old.pdf',
     ]);
 
@@ -133,7 +132,6 @@ it('can regenerate existing technical memory and reset sections', function (): v
     expect($memory)->not->toBeNull();
     expect($memory?->status)->toBe('draft');
     expect($memory?->generated_at)->toBeNull();
-    expect($memory?->introduction)->toBeNull();
     expect($memory?->generated_file_path)->toBeNull();
 });
 

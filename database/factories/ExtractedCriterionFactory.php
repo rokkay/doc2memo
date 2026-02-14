@@ -20,6 +20,9 @@ class ExtractedCriterionFactory extends Factory
             'section_title' => fake()->sentence(4),
             'description' => fake()->paragraph(),
             'priority' => fake()->randomElement(['mandatory', 'preferable', 'optional']),
+            'criterion_type' => 'judgment',
+            'score_points' => fake()->optional()->randomFloat(2, 1, 60),
+            'group_key' => strtolower(fake()->slug(3)),
             'metadata' => null,
         ];
     }
