@@ -19,6 +19,8 @@ final class JudgmentCriterionData
         public readonly string $criterionType,
         public readonly ?float $scorePoints,
         public readonly string $groupKey,
+        public readonly string $source,
+        public readonly ?float $confidence,
         public readonly ?array $metadata,
     ) {}
 
@@ -32,6 +34,8 @@ final class JudgmentCriterionData
             criterionType: (string) $criterion->criterion_type,
             scorePoints: $criterion->score_points !== null ? (float) $criterion->score_points : null,
             groupKey: (string) ($criterion->group_key ?? ''),
+            source: (string) ($criterion->source ?? 'analyzer'),
+            confidence: $criterion->confidence !== null ? (float) $criterion->confidence : null,
             metadata: is_array($criterion->metadata) ? $criterion->metadata : null,
         );
     }
@@ -49,12 +53,14 @@ final class JudgmentCriterionData
             criterionType: (string) ($payload['criterion_type'] ?? 'judgment'),
             scorePoints: self::toNullableFloat($payload['score_points'] ?? null),
             groupKey: (string) ($payload['group_key'] ?? ''),
+            source: (string) ($payload['source'] ?? 'analyzer'),
+            confidence: self::toNullableFloat($payload['confidence'] ?? null),
             metadata: is_array($payload['metadata'] ?? null) ? $payload['metadata'] : null,
         );
     }
 
     /**
-     * @return array{section_number:?string,section_title:string,description:string,priority:string,criterion_type:string,score_points:?float,group_key:string,metadata:?array<string,mixed>}
+     * @return array{section_number:?string,section_title:string,description:string,priority:string,criterion_type:string,score_points:?float,group_key:string,source:string,confidence:?float,metadata:?array<string,mixed>}
      */
     public function toArray(): array
     {
@@ -66,6 +72,8 @@ final class JudgmentCriterionData
             'criterion_type' => $this->criterionType,
             'score_points' => $this->scorePoints,
             'group_key' => $this->groupKey,
+            'source' => $this->source,
+            'confidence' => $this->confidence,
             'metadata' => $this->metadata,
         ];
     }

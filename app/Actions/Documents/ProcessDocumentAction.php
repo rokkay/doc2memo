@@ -133,6 +133,8 @@ final class ProcessDocumentAction
                 'priority' => (string) ($criterion['priority'] ?? 'mandatory'),
                 'criterion_type' => $criterionType,
                 'score_points' => $criterion['score_points'] ?? null,
+                'source' => 'analyzer',
+                'confidence' => 0.70,
                 'metadata' => is_array($criterion['metadata'] ?? null) ? $criterion['metadata'] : null,
             ]);
 
@@ -156,6 +158,8 @@ final class ProcessDocumentAction
                         description: $criterionItem->description,
                         metadata: $criterionItem->metadata ?? [],
                     ),
+                    'source' => $criterionItem->source,
+                    'confidence' => $criterionItem->confidence,
                     'group_key' => $this->buildGroupKey(
                         sectionNumber: $sectionNumber,
                         sectionTitle: $sectionTitle,
@@ -188,6 +192,8 @@ final class ProcessDocumentAction
                         description: $criterionItem->description,
                         metadata: $criterionItem->metadata ?? [],
                     ),
+                    'source' => $criterionItem->source,
+                    'confidence' => $criterionItem->confidence,
                     'metadata' => $criterionItem->metadata,
                 ],
             );
@@ -216,6 +222,8 @@ final class ProcessDocumentAction
                     'priority' => $item['priority'] ?? 'mandatory',
                     'criterion_type' => 'judgment',
                     'score_points' => $item['score_points'] ?? null,
+                    'source' => 'dedicated_extractor',
+                    'confidence' => 0.95,
                     'group_key' => '',
                     'metadata' => is_array($item['metadata'] ?? null) ? $item['metadata'] : null,
                 ]))
@@ -280,6 +288,8 @@ final class ProcessDocumentAction
                     'priority' => $criterion->priority,
                     'criterion_type' => 'judgment',
                     'score_points' => $subcriterion['score_points'],
+                    'source' => 'parser',
+                    'confidence' => 0.65,
                     'metadata' => $criterion->metadata,
                 ]);
             })

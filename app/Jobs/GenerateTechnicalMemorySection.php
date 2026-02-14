@@ -27,6 +27,8 @@ class GenerateTechnicalMemorySection implements ShouldQueue
 
     public function handle(): void
     {
+        $startedAt = microtime(true);
+
         $section = TechnicalMemorySection::query()
             ->with('technicalMemory')
             ->find($this->technicalMemorySectionId);
@@ -50,23 +52,35 @@ class GenerateTechnicalMemorySection implements ShouldQueue
                 context: $this->context->toArray(),
             ))->generate();
 
-            try {
-                $editedContent = (new TechnicalMemorySectionEditorAgent(
-                    section: $this->section->toArray(),
-                ))->edit($content);
+            if ((bool) config('technical_memory.style_editor.enabled', true)) {
+                try {
+                    $editedContent = (new TechnicalMemorySectionEditorAgent(
+                        section: $this->section->toArray(),
+                    ))->edit($content);
 
-                if ($editedContent !== '') {
-                    $content = $editedContent;
+                    if ($editedContent !== '') {
+                        $content = $editedContent;
+                    }
+                } catch (Throwable $exception) {
+                    Log::warning('Section style editor failed, using raw generated content.', [
+                        'technical_memory_section_id' => $section->id,
+                        'error' => $exception->getMessage(),
+                    ]);
                 }
-            } catch (Throwable $exception) {
-                Log::warning('Section style editor failed, using raw generated content.', [
-                    'technical_memory_section_id' => $section->id,
-                    'error' => $exception->getMessage(),
-                ]);
             }
 
             $medianCompletedLength = $this->medianCompletedSectionLength($memory->id, $section->id);
             $qualityCheck = $qualityGate->evaluate($content, $medianCompletedLength);
+
+            Log::info('Technical memory section generation quality evaluation completed.', [
+                'technical_memory_id' => $memory->id,
+                'technical_memory_section_id' => $section->id,
+                'quality_attempt' => $this->qualityAttempt,
+                'passes_quality_gate' => $qualityCheck['passes'],
+                'quality_reasons' => $qualityCheck['reasons'],
+                'content_length' => mb_strlen(trim($content)),
+                'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+            ]);
 
             if (! $qualityCheck['passes']) {
                 $qualityFeedback = implode(' ', $qualityCheck['reasons']);
@@ -102,10 +116,25 @@ class GenerateTechnicalMemorySection implements ShouldQueue
                 'content' => $content,
                 'error_message' => null,
             ]);
+
+            Log::info('Technical memory section generation completed.', [
+                'technical_memory_id' => $memory->id,
+                'technical_memory_section_id' => $section->id,
+                'quality_attempt' => $this->qualityAttempt,
+                'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+            ]);
         } catch (Throwable $exception) {
             $section->update([
                 'status' => TechnicalMemorySectionStatus::Failed,
                 'error_message' => $exception->getMessage(),
+            ]);
+
+            Log::error('Technical memory section generation failed.', [
+                'technical_memory_id' => $memory->id,
+                'technical_memory_section_id' => $section->id,
+                'quality_attempt' => $this->qualityAttempt,
+                'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+                'error' => $exception->getMessage(),
             ]);
 
             throw $exception;

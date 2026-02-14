@@ -23,6 +23,8 @@ class ExtractedCriterion extends Model
         'criterion_type',
         'score_points',
         'group_key',
+        'source',
+        'confidence',
         'metadata',
     ];
 
@@ -31,6 +33,7 @@ class ExtractedCriterion extends Model
         return [
             'metadata' => 'array',
             'score_points' => 'decimal:2',
+            'confidence' => 'decimal:2',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];

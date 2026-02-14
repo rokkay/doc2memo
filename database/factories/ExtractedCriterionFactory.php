@@ -23,6 +23,8 @@ class ExtractedCriterionFactory extends Factory
             'criterion_type' => 'judgment',
             'score_points' => fake()->optional()->randomFloat(2, 1, 60),
             'group_key' => strtolower(fake()->slug(3)),
+            'source' => fake()->randomElement(['analyzer', 'dedicated_extractor', 'parser']),
+            'confidence' => fake()->optional()->randomFloat(2, 0.5, 0.99),
             'metadata' => null,
         ];
     }

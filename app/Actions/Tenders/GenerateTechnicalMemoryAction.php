@@ -220,6 +220,8 @@ final class GenerateTechnicalMemoryAction
                         'criterion_type' => $criterionData->criterionType,
                         'score_points' => $scorePoints,
                         'group_key' => $this->judgmentCriteriaParser->buildGroupKey($normalizedNumber, $normalizedTitle),
+                        'source' => 'parser',
+                        'confidence' => 0.65,
                         'metadata' => $criterionData->metadata,
                     ]);
                 })
