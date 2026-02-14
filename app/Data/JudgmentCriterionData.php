@@ -21,6 +21,7 @@ final class JudgmentCriterionData
         public readonly string $groupKey,
         public readonly string $source,
         public readonly ?float $confidence,
+        public readonly ?string $sourceReference,
         public readonly ?array $metadata,
     ) {}
 
@@ -36,6 +37,7 @@ final class JudgmentCriterionData
             groupKey: (string) ($criterion->group_key ?? ''),
             source: (string) ($criterion->source ?? 'analyzer'),
             confidence: $criterion->confidence !== null ? (float) $criterion->confidence : null,
+            sourceReference: $criterion->source_reference !== null ? (string) $criterion->source_reference : null,
             metadata: is_array($criterion->metadata) ? $criterion->metadata : null,
         );
     }
@@ -55,12 +57,13 @@ final class JudgmentCriterionData
             groupKey: (string) ($payload['group_key'] ?? ''),
             source: (string) ($payload['source'] ?? 'analyzer'),
             confidence: self::toNullableFloat($payload['confidence'] ?? null),
+            sourceReference: isset($payload['source_reference']) ? (string) $payload['source_reference'] : null,
             metadata: is_array($payload['metadata'] ?? null) ? $payload['metadata'] : null,
         );
     }
 
     /**
-     * @return array{section_number:?string,section_title:string,description:string,priority:string,criterion_type:string,score_points:?float,group_key:string,source:string,confidence:?float,metadata:?array<string,mixed>}
+     * @return array{section_number:?string,section_title:string,description:string,priority:string,criterion_type:string,score_points:?float,group_key:string,source:string,confidence:?float,source_reference:?string,metadata:?array<string,mixed>}
      */
     public function toArray(): array
     {
@@ -74,6 +77,7 @@ final class JudgmentCriterionData
             'group_key' => $this->groupKey,
             'source' => $this->source,
             'confidence' => $this->confidence,
+            'source_reference' => $this->sourceReference,
             'metadata' => $this->metadata,
         ];
     }

@@ -222,6 +222,7 @@ final class GenerateTechnicalMemoryAction
                         'group_key' => $this->judgmentCriteriaParser->buildGroupKey($normalizedNumber, $normalizedTitle),
                         'source' => 'parser',
                         'confidence' => 0.65,
+                        'source_reference' => $criterionData->sourceReference,
                         'metadata' => $criterionData->metadata,
                     ]);
                 })

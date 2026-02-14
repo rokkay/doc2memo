@@ -25,6 +25,7 @@ class ExtractedCriterionFactory extends Factory
             'group_key' => strtolower(fake()->slug(3)),
             'source' => fake()->randomElement(['analyzer', 'dedicated_extractor', 'parser']),
             'confidence' => fake()->optional()->randomFloat(2, 0.5, 0.99),
+            'source_reference' => fake()->optional()->randomElement(['Sección 1.1', 'Tabla de criterios', 'Página 12']),
             'metadata' => null,
         ];
     }

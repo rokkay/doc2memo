@@ -62,6 +62,8 @@ it('stores criterion type, score points, and group key from analyzer payload', f
         'criterion_type' => 'judgment',
         'score_points' => 35.00,
         'group_key' => '1.2-metodologia',
+        'source' => 'analyzer',
+        'source_reference' => '1.2 Metodología',
     ]);
 });
 
@@ -159,6 +161,7 @@ it('uses dedicated judgment criteria agent to extract over-b scoring table', fun
         'section_number' => '1.1',
         'section_title' => 'Propuesta de Evolución Funcional',
         'score_points' => 16.00,
+        'source' => 'dedicated_extractor',
     ]);
 
     assertDatabaseHas('extracted_criteria', [

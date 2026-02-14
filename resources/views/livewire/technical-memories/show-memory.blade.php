@@ -182,6 +182,23 @@
                                     <p class="mt-3 text-sm text-slate-500 dark:text-slate-400">Sección pendiente de generación.</p>
                                 @endif
                             @else
+                                @if($section['evidence'] !== [])
+                                    <div class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs dark:border-slate-700 dark:bg-slate-800/60">
+                                        <p class="font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Evidencias de evaluación usadas</p>
+                                        <ul class="mt-2 space-y-2">
+                                            @foreach($section['evidence'] as $evidence)
+                                                <li>
+                                                    <p class="font-medium text-slate-700 dark:text-slate-200">{{ $evidence['label'] }}</p>
+                                                    @if(! empty($evidence['reference']))
+                                                        <p class="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Origen: {{ $evidence['reference'] }}</p>
+                                                    @endif
+                                                    <p class="text-slate-600 dark:text-slate-300">{{ $evidence['detail'] }}</p>
+                                                </li>
+                                            @endforeach
+                                        </ul>
+                                    </div>
+                                @endif
+
                                 <x-markdown class="mt-3 space-y-4 text-sm leading-7 text-slate-700 dark:text-slate-200 [&_a]:text-cyan-700 [&_a]:underline [&_code]:rounded [&_code]:bg-slate-100 [&_code]:px-1 [&_code]:py-0.5 dark:[&_code]:bg-slate-800 dark:[&_code]:text-slate-100 [&_h3]:mt-6 [&_h3]:text-lg [&_h3]:font-semibold [&_h3]:leading-7 [&_h3]:text-slate-900 dark:[&_h3]:text-slate-100 [&_h4]:mt-4 [&_h4]:text-base [&_h4]:font-semibold [&_h4]:text-slate-800 dark:[&_h4]:text-slate-200 [&_ol]:list-decimal [&_ol]:pl-6 [&_ul]:list-disc [&_ul]:pl-6 [&_table]:w-full [&_table]:border [&_table]:border-slate-300 [&_th]:bg-slate-100 [&_th]:font-semibold [&_th]:text-left [&_th]:border [&_th]:border-slate-300 [&_th]:px-3 [&_th]:py-2 [&_td]:border [&_td]:border-slate-300 [&_td]:px-3 [&_td]:py-2 dark:[&_table]:border-slate-700 dark:[&_th]:border-slate-700 dark:[&_th]:bg-slate-800 dark:[&_td]:border-slate-700">
                                     {{ $section['content'] }}
                                 </x-markdown>

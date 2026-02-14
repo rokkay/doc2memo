@@ -26,6 +26,7 @@ it('renders successfully with dynamic memory sections', function (): void {
 
     TechnicalMemorySection::factory()->create([
         'technical_memory_id' => $memory->id,
+        'group_key' => '1.1-metodologia',
         'section_number' => '1.1',
         'section_title' => 'Metodología',
         'sort_order' => 1,
@@ -35,17 +36,21 @@ it('renders successfully with dynamic memory sections', function (): void {
 
     ExtractedCriterion::factory()->create([
         'tender_id' => $tender->id,
+        'group_key' => '1.1-metodologia',
         'section_number' => '1.1',
         'section_title' => 'Criterios adjudicación (B) Juicio de valor - Metodología',
         'criterion_type' => 'judgment',
         'priority' => 'mandatory',
         'score_points' => 20,
+        'source_reference' => 'Tabla B.1',
     ]);
 
     Livewire::test(ShowMemory::class, ['tender' => $tender])
         ->assertOk()
         ->assertSee('Memoria Técnica Dinámica')
         ->assertSee('1.1 Metodología')
+        ->assertSee('Evidencias de evaluación usadas')
+        ->assertSee('Origen: Tabla B.1')
         ->assertDontSee('Criterios adjudicación (B) Juicio de valor - Metodología')
         ->assertSee('Texto de metodología.');
 });

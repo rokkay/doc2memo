@@ -42,7 +42,7 @@ final class TechnicalMemorySectionData
     }
 
     /**
-     * @return array{group_key:string,section_number:?string,section_title:string,total_points:float,criteria_count:int,criteria:array<int,array{section_number:?string,section_title:string,description:string,priority:string,criterion_type:string,score_points:?float,group_key:string,source:string,confidence:?float,metadata:?array<string,mixed>}>,sort_key:string}
+     * @return array{group_key:string,section_number:?string,section_title:string,total_points:float,criteria_count:int,criteria:array<int,array{section_number:?string,section_title:string,description:string,priority:string,criterion_type:string,score_points:?float,group_key:string,source:string,confidence:?float,source_reference:?string,metadata:?array<string,mixed>}>,sort_key:string}
      */
     public function toArray(): array
     {

@@ -12,9 +12,9 @@ use App\Support\TechnicalMemoryMarkdownBuilder;
 final class TechnicalMemoryViewData
 {
     /**
-     * @param  array<int,array{id:int,anchor:string,title:string,content:string,points:float,weight:float,criteria_count:int,status:string}>  $sections
-     * @param  array<int,array{id:int,anchor:string,title:string,content:string,points:float,weight:float,criteria_count:int,status:string}>  $inProgressSections
-     * @param  array<int,array{id:int,anchor:string,title:string,content:string,points:float,weight:float,criteria_count:int,status:string}>  $failedSections
+     * @param  array<int,array{id:int,anchor:string,title:string,content:string,points:float,weight:float,criteria_count:int,status:string,evidence:array<int,array{label:string,detail:string,reference:?string}>}>  $sections
+     * @param  array<int,array{id:int,anchor:string,title:string,content:string,points:float,weight:float,criteria_count:int,status:string,evidence:array<int,array{label:string,detail:string,reference:?string}>}>  $inProgressSections
+     * @param  array<int,array{id:int,anchor:string,title:string,content:string,points:float,weight:float,criteria_count:int,status:string,evidence:array<int,array{label:string,detail:string,reference:?string}>}>  $failedSections
      */
     public function __construct(
         public readonly bool $hasMemory,
@@ -48,10 +48,37 @@ final class TechnicalMemoryViewData
             );
         }
 
+        $criteriaByGroup = $tender->extractedCriteria
+            ->where('criterion_type', 'judgment')
+            ->groupBy(fn ($criterion): string => (string) ($criterion->group_key ?? ''));
+
         $sections = $memory->sections
             ->sortBy('sort_order')
-            ->map(function ($section): array {
+            ->map(function ($section) use ($criteriaByGroup): array {
                 $anchor = 'section-'.$section->id;
+                $groupKey = (string) ($section->group_key ?? '');
+                $criteria = $criteriaByGroup->get($groupKey, collect());
+
+                $evidence = $criteria
+                    ->map(function ($criterion): array {
+                        $label = trim((string) ($criterion->section_number ?? ''));
+                        $label = $label !== '' ? $label : 'Criterio';
+
+                        $points = $criterion->score_points !== null
+                            ? number_format((float) $criterion->score_points, 2, ',', '.').' pts'
+                            : 'Puntos N/D';
+
+                        return [
+                            'label' => $label.' · '.$points,
+                            'detail' => trim((string) $criterion->description),
+                            'reference' => $criterion->source_reference !== null ? trim((string) $criterion->source_reference) : null,
+                        ];
+                    })
+                    ->filter(fn (array $item): bool => $item['detail'] !== '')
+                    ->unique('detail')
+                    ->take(3)
+                    ->values()
+                    ->all();
 
                 return [
                     'id' => $section->id,
@@ -64,6 +91,7 @@ final class TechnicalMemoryViewData
                     'status' => $section->status instanceof TechnicalMemorySectionStatus
                         ? $section->status->value
                         : (string) $section->status,
+                    'evidence' => $evidence,
                 ];
             })
             ->values()

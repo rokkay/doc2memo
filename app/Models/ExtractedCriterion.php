@@ -25,6 +25,7 @@ class ExtractedCriterion extends Model
         'group_key',
         'source',
         'confidence',
+        'source_reference',
         'metadata',
     ];
 

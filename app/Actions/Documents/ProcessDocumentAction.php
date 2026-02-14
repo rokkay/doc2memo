@@ -135,6 +135,11 @@ final class ProcessDocumentAction
                 'score_points' => $criterion['score_points'] ?? null,
                 'source' => 'analyzer',
                 'confidence' => 0.70,
+                'source_reference' => $this->resolveSourceReference(
+                    sectionNumber: is_string($criterion['section_number'] ?? null) ? $criterion['section_number'] : null,
+                    sectionTitle: (string) ($criterion['section_title'] ?? ''),
+                    metadata: is_array($criterion['metadata'] ?? null) ? $criterion['metadata'] : [],
+                ),
                 'metadata' => is_array($criterion['metadata'] ?? null) ? $criterion['metadata'] : null,
             ]);
 
@@ -160,6 +165,7 @@ final class ProcessDocumentAction
                     ),
                     'source' => $criterionItem->source,
                     'confidence' => $criterionItem->confidence,
+                    'source_reference' => $criterionItem->sourceReference,
                     'group_key' => $this->buildGroupKey(
                         sectionNumber: $sectionNumber,
                         sectionTitle: $sectionTitle,
@@ -194,6 +200,7 @@ final class ProcessDocumentAction
                     ),
                     'source' => $criterionItem->source,
                     'confidence' => $criterionItem->confidence,
+                    'source_reference' => $criterionItem->sourceReference,
                     'metadata' => $criterionItem->metadata,
                 ],
             );
@@ -224,6 +231,11 @@ final class ProcessDocumentAction
                     'score_points' => $item['score_points'] ?? null,
                     'source' => 'dedicated_extractor',
                     'confidence' => 0.95,
+                    'source_reference' => $this->resolveSourceReference(
+                        sectionNumber: is_string($item['section_number'] ?? null) ? $item['section_number'] : null,
+                        sectionTitle: (string) ($item['section_title'] ?? ''),
+                        metadata: is_array($item['metadata'] ?? null) ? $item['metadata'] : [],
+                    ),
                     'group_key' => '',
                     'metadata' => is_array($item['metadata'] ?? null) ? $item['metadata'] : null,
                 ]))
@@ -290,10 +302,42 @@ final class ProcessDocumentAction
                     'score_points' => $subcriterion['score_points'],
                     'source' => 'parser',
                     'confidence' => 0.65,
+                    'source_reference' => $criterion->sourceReference,
                     'metadata' => $criterion->metadata,
                 ]);
             })
             ->all();
+    }
+
+    /**
+     * @param  array<string,mixed>  $metadata
+     */
+    private function resolveSourceReference(?string $sectionNumber, string $sectionTitle, array $metadata): ?string
+    {
+        $fromMetadata = collect([
+            $metadata['source_reference'] ?? null,
+            $metadata['section_reference'] ?? null,
+            $metadata['reference'] ?? null,
+            $metadata['page'] ?? null,
+            $metadata['page_reference'] ?? null,
+        ])->first(fn (mixed $value): bool => is_string($value) && trim($value) !== '');
+
+        if (is_string($fromMetadata) && trim($fromMetadata) !== '') {
+            return trim($fromMetadata);
+        }
+
+        $number = trim((string) $sectionNumber);
+        $title = trim($sectionTitle);
+
+        if ($number !== '' && $title !== '') {
+            return $number.' '.$title;
+        }
+
+        if ($number !== '') {
+            return $number;
+        }
+
+        return $title !== '' ? $title : null;
     }
 
     private function storePptData(Document $document, array $analysis): void

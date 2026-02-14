@@ -76,7 +76,7 @@ final class RegenerateSectionAction
     }
 
     /**
-     * @return array<int,array{section_number:?string,section_title:string,description:string,priority:string,criterion_type:string,score_points:?float,group_key:string,source:string,confidence:?float,metadata:?array<string,mixed>}>
+     * @return array<int,array{section_number:?string,section_title:string,description:string,priority:string,criterion_type:string,score_points:?float,group_key:string,source:string,confidence:?float,source_reference:?string,metadata:?array<string,mixed>}>
      */
     private function buildPcaCriteriaPayload(Tender $tender): array
     {
