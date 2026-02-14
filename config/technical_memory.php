@@ -13,4 +13,8 @@ return [
     'style_editor' => [
         'enabled' => true,
     ],
+
+    'metrics' => [
+        'retention_days' => 90,
+    ],
 ];
