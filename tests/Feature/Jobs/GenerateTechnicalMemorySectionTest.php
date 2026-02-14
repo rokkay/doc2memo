@@ -120,6 +120,7 @@ it('generates a section and keeps memory in draft when pending sections remain',
         ->and((float) $metric?->estimated_cost_usd)->toBeGreaterThan(0.0)
         ->and((float) $metric?->estimated_cost_usd)->toBe($breakdownTotal)
         ->and($breakdown)->toBeArray()
+        ->and($breakdown)->toHaveKeys(['dynamic_section', 'style_editor'])
         ->and(data_get($breakdown, 'dynamic_section.status'))->toBe('completed')
         ->and(data_get($breakdown, 'style_editor.status'))->toBe('completed');
 });
@@ -266,6 +267,7 @@ it('retries once when generated section does not meet quality gate', function ()
         ->and((float) $metric?->estimated_cost_usd)->toBeGreaterThan(0.0)
         ->and((float) $metric?->estimated_cost_usd)->toBe($breakdownTotal)
         ->and($breakdown)->toBeArray()
+        ->and($breakdown)->toHaveKeys(['dynamic_section', 'style_editor'])
         ->and(data_get($breakdown, 'dynamic_section.status'))->toBe('completed')
         ->and(data_get($breakdown, 'style_editor.status'))->toBe('completed');
 });

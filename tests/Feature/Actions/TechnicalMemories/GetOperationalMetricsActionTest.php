@@ -148,6 +148,15 @@ it('calculates global kpis durations and per memory rollups', function (): void 
         to: CarbonImmutable::parse('2026-02-11 23:59:59'),
     );
 
+    expect($result->global)->toHaveKeys([
+        'estimated_cost_usd',
+        'estimated_dynamic_cost_usd',
+        'estimated_style_editor_cost_usd',
+        'estimated_document_analysis_cost_usd',
+        'estimated_document_analyzer_cost_usd',
+        'estimated_dedicated_extractor_cost_usd',
+    ]);
+
     expect($result->global['first_pass_rate'])->toBe(50.0)
         ->and($result->global['retry_rate'])->toBe(25.0)
         ->and($result->global['failure_rate'])->toBe(25.0)
@@ -251,6 +260,15 @@ it('filters metrics by date range', function (): void {
         from: CarbonImmutable::parse('2026-02-11 00:00:00'),
         to: CarbonImmutable::parse('2026-02-11 23:59:59'),
     );
+
+    expect($result->global)->toHaveKeys([
+        'estimated_cost_usd',
+        'estimated_dynamic_cost_usd',
+        'estimated_style_editor_cost_usd',
+        'estimated_document_analysis_cost_usd',
+        'estimated_document_analyzer_cost_usd',
+        'estimated_dedicated_extractor_cost_usd',
+    ]);
 
     expect($result->global['attempts'])->toBe(1)
         ->and($result->global['estimated_cost_usd'])->toBe(0.3)

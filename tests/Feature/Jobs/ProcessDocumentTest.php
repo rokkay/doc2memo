@@ -68,8 +68,18 @@ it('processes a pca markdown document and stores extracted data', function (): v
     expect($processedDocument?->status)->toBe('analyzed')
         ->and((float) $processedDocument?->estimated_analysis_cost_usd)->toBeGreaterThan(0.0)
         ->and($processedDocument?->analysis_cost_breakdown)->toBeArray()
+        ->and($processedDocument?->analysis_cost_breakdown)->toHaveKeys(['document_analyzer', 'dedicated_judgment_extractor'])
         ->and(data_get($processedDocument?->analysis_cost_breakdown, 'document_analyzer.status'))->toBe('completed')
         ->and(data_get($processedDocument?->analysis_cost_breakdown, 'dedicated_judgment_extractor.status'))->toBe('skipped');
+
+    $analysisBreakdown = $processedDocument?->analysis_cost_breakdown;
+    $analysisBreakdownTotal = round(
+        (float) data_get($analysisBreakdown, 'document_analyzer.estimated_cost_usd', 0)
+        + (float) data_get($analysisBreakdown, 'dedicated_judgment_extractor.estimated_cost_usd', 0),
+        6,
+    );
+
+    expect((float) $processedDocument?->estimated_analysis_cost_usd)->toBe($analysisBreakdownTotal);
 
     assertDatabaseHas('extracted_criteria', [
         'document_id' => $document->id,
@@ -115,7 +125,20 @@ it('stores textual deadline date extracted by ai', function (): void {
 
     (new ProcessDocument($document))->handle();
 
-    expect($document->fresh()->status)->toBe('analyzed');
+    $processedDocument = $document->fresh();
+
+    expect($processedDocument?->status)->toBe('analyzed')
+        ->and($processedDocument?->analysis_cost_breakdown)->toBeArray()
+        ->and($processedDocument?->analysis_cost_breakdown)->toHaveKeys(['document_analyzer', 'dedicated_judgment_extractor']);
+
+    $analysisBreakdown = $processedDocument?->analysis_cost_breakdown;
+    $analysisBreakdownTotal = round(
+        (float) data_get($analysisBreakdown, 'document_analyzer.estimated_cost_usd', 0)
+        + (float) data_get($analysisBreakdown, 'dedicated_judgment_extractor.estimated_cost_usd', 0),
+        6,
+    );
+
+    expect((float) $processedDocument?->estimated_analysis_cost_usd)->toBe($analysisBreakdownTotal);
     expect($tender->fresh()->deadline_date)->toBe('“decimoquinto dia, contado desde el dia siguiente al de la publicacion del anuncio...”');
 });
 
