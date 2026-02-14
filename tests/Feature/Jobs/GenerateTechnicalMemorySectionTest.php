@@ -8,6 +8,7 @@ use App\Data\TechnicalMemoryGenerationContextData;
 use App\Data\TechnicalMemorySectionData;
 use App\Enums\TechnicalMemorySectionStatus;
 use App\Jobs\GenerateTechnicalMemorySection;
+use App\Models\TechnicalMemoryMetricEvent;
 use App\Models\TechnicalMemory;
 use App\Models\TechnicalMemorySection;
 use App\Models\Tender;
@@ -78,6 +79,17 @@ it('generates a section and keeps memory in draft when pending sections remain',
     expect($section?->content)->toContain('Metodología propuesta');
     expect($memory?->status)->toBe('draft');
     expect($memory?->generated_at)->toBeNull();
+
+    $events = TechnicalMemoryMetricEvent::query()
+        ->where('technical_memory_id', $memory->id)
+        ->where('technical_memory_section_id', $section->id)
+        ->orderBy('id')
+        ->get();
+
+    expect($events->pluck('event_type')->all())->toBe(['started', 'completed'])
+        ->and($events->pluck('run_id')->unique()->count())->toBe(1)
+        ->and($events->first()?->attempt)->toBe(1)
+        ->and($events->last()?->attempt)->toBe(1);
 });
 
 it('marks memory as generated when all dynamic sections finish', function (): void {

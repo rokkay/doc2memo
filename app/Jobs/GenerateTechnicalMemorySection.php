@@ -2,12 +2,14 @@
 
 namespace App\Jobs;
 
+use App\Actions\TechnicalMemories\RecordMetricEventAction;
 use App\Ai\Agents\TechnicalMemoryDynamicSectionAgent;
 use App\Ai\Agents\TechnicalMemorySectionEditorAgent;
 use App\Data\TechnicalMemoryGenerationContextData;
 use App\Data\TechnicalMemorySectionData;
 use App\Enums\TechnicalMemorySectionStatus;
 use App\Models\TechnicalMemorySection;
+use App\Support\TechnicalMemoryMetrics;
 use App\Support\TechnicalMemorySectionQualityGate;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -43,6 +45,25 @@ class GenerateTechnicalMemorySection implements ShouldQueue
             : $this->context->withRunId((string) Str::uuid());
 
         $memory = $section->technicalMemory;
+        $recordMetricEvent = new RecordMetricEventAction;
+        $attempt = $this->qualityAttempt + 1;
+        $usedStyleEditor = (bool) config('technical_memory.style_editor.enabled', true);
+        $outputChars = null;
+        $outputH3Count = null;
+
+        $recordMetricEvent(
+            memory: $memory,
+            section: $section,
+            runId: (string) $context->runId,
+            attempt: $attempt,
+            eventType: TechnicalMemoryMetrics::EVENT_STARTED,
+            status: TechnicalMemorySectionStatus::Generating->value,
+            durationMs: 0,
+            usedStyleEditor: $usedStyleEditor,
+            metadata: [
+                'quality_attempt' => $this->qualityAttempt,
+            ],
+        );
 
         $section->update([
             'status' => TechnicalMemorySectionStatus::Generating,
@@ -57,7 +78,7 @@ class GenerateTechnicalMemorySection implements ShouldQueue
                 context: $context->toArray(),
             ))->generate();
 
-            if ((bool) config('technical_memory.style_editor.enabled', true)) {
+            if ($usedStyleEditor) {
                 try {
                     $editedContent = (new TechnicalMemorySectionEditorAgent(
                         section: $this->section->toArray(),
@@ -76,6 +97,9 @@ class GenerateTechnicalMemorySection implements ShouldQueue
 
             $medianCompletedLength = $this->medianCompletedSectionLength($memory->id, $section->id);
             $qualityCheck = $qualityGate->evaluate($content, $medianCompletedLength);
+            $outputChars = mb_strlen(trim($content));
+            $outputH3Count = preg_match_all('/^###\s+/m', $content) ?: 0;
+            $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
 
             Log::info('Technical memory section generation quality evaluation completed.', [
                 'technical_memory_id' => $memory->id,
@@ -83,12 +107,30 @@ class GenerateTechnicalMemorySection implements ShouldQueue
                 'quality_attempt' => $this->qualityAttempt,
                 'passes_quality_gate' => $qualityCheck['passes'],
                 'quality_reasons' => $qualityCheck['reasons'],
-                'content_length' => mb_strlen(trim($content)),
-                'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+                'content_length' => $outputChars,
+                'duration_ms' => $durationMs,
             ]);
 
             if (! $qualityCheck['passes']) {
                 $qualityFeedback = implode(' ', $qualityCheck['reasons']);
+                $recordMetricEvent(
+                    memory: $memory,
+                    section: $section,
+                    runId: (string) $context->runId,
+                    attempt: $attempt,
+                    eventType: TechnicalMemoryMetrics::EVENT_QUALITY_FAILED,
+                    status: TechnicalMemorySectionStatus::Generating->value,
+                    durationMs: $durationMs,
+                    qualityPassed: false,
+                    qualityReasons: $qualityCheck['reasons'],
+                    outputChars: $outputChars,
+                    outputH3Count: $outputH3Count,
+                    usedStyleEditor: $usedStyleEditor,
+                    metadata: [
+                        'quality_attempt' => $this->qualityAttempt,
+                        'max_retry_attempts' => (int) config('technical_memory.quality_gate.max_retry_attempts', 1),
+                    ],
+                );
 
                 $maxRetryAttempts = (int) config('technical_memory.quality_gate.max_retry_attempts', 1);
 
@@ -105,6 +147,25 @@ class GenerateTechnicalMemorySection implements ShouldQueue
                         qualityAttempt: $this->qualityAttempt + 1,
                     );
 
+                    $recordMetricEvent(
+                        memory: $memory,
+                        section: $section,
+                        runId: (string) $context->runId,
+                        attempt: $attempt,
+                        eventType: TechnicalMemoryMetrics::EVENT_REQUEUED,
+                        status: TechnicalMemorySectionStatus::Pending->value,
+                        durationMs: $durationMs,
+                        qualityPassed: false,
+                        qualityReasons: $qualityCheck['reasons'],
+                        outputChars: $outputChars,
+                        outputH3Count: $outputH3Count,
+                        usedStyleEditor: $usedStyleEditor,
+                        metadata: [
+                            'quality_attempt' => $this->qualityAttempt,
+                            'next_quality_attempt' => $this->qualityAttempt + 1,
+                        ],
+                    );
+
                     return;
                 }
 
@@ -112,6 +173,25 @@ class GenerateTechnicalMemorySection implements ShouldQueue
                     'status' => TechnicalMemorySectionStatus::Failed,
                     'error_message' => $qualityFeedback,
                 ]);
+
+                $recordMetricEvent(
+                    memory: $memory,
+                    section: $section,
+                    runId: (string) $context->runId,
+                    attempt: $attempt,
+                    eventType: TechnicalMemoryMetrics::EVENT_FAILED,
+                    status: TechnicalMemorySectionStatus::Failed->value,
+                    durationMs: $durationMs,
+                    qualityPassed: false,
+                    qualityReasons: $qualityCheck['reasons'],
+                    outputChars: $outputChars,
+                    outputH3Count: $outputH3Count,
+                    usedStyleEditor: $usedStyleEditor,
+                    metadata: [
+                        'quality_attempt' => $this->qualityAttempt,
+                        'reason' => 'quality_gate_exhausted',
+                    ],
+                );
 
                 return;
             }
@@ -122,23 +202,61 @@ class GenerateTechnicalMemorySection implements ShouldQueue
                 'error_message' => null,
             ]);
 
+            $recordMetricEvent(
+                memory: $memory,
+                section: $section,
+                runId: (string) $context->runId,
+                attempt: $attempt,
+                eventType: TechnicalMemoryMetrics::EVENT_COMPLETED,
+                status: TechnicalMemorySectionStatus::Completed->value,
+                durationMs: $durationMs,
+                qualityPassed: true,
+                qualityReasons: [],
+                outputChars: $outputChars,
+                outputH3Count: $outputH3Count,
+                usedStyleEditor: $usedStyleEditor,
+                metadata: [
+                    'quality_attempt' => $this->qualityAttempt,
+                ],
+            );
+
             Log::info('Technical memory section generation completed.', [
                 'technical_memory_id' => $memory->id,
                 'technical_memory_section_id' => $section->id,
                 'quality_attempt' => $this->qualityAttempt,
-                'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+                'duration_ms' => $durationMs,
             ]);
         } catch (Throwable $exception) {
+            $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
+
             $section->update([
                 'status' => TechnicalMemorySectionStatus::Failed,
                 'error_message' => $exception->getMessage(),
             ]);
 
+            $recordMetricEvent(
+                memory: $memory,
+                section: $section,
+                runId: (string) $context->runId,
+                attempt: $attempt,
+                eventType: TechnicalMemoryMetrics::EVENT_FAILED,
+                status: TechnicalMemorySectionStatus::Failed->value,
+                durationMs: $durationMs,
+                outputChars: $outputChars,
+                outputH3Count: $outputH3Count,
+                usedStyleEditor: $usedStyleEditor,
+                metadata: [
+                    'quality_attempt' => $this->qualityAttempt,
+                    'error' => $exception->getMessage(),
+                    'exception_class' => $exception::class,
+                ],
+            );
+
             Log::error('Technical memory section generation failed.', [
                 'technical_memory_id' => $memory->id,
                 'technical_memory_section_id' => $section->id,
                 'quality_attempt' => $this->qualityAttempt,
-                'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+                'duration_ms' => $durationMs,
                 'error' => $exception->getMessage(),
             ]);
 
