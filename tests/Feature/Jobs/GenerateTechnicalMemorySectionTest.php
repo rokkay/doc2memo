@@ -15,6 +15,8 @@ use App\Models\Tender;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 
+use function Pest\Laravel\assertDatabaseHas;
+
 uses(RefreshDatabase::class);
 
 it('generates a section and keeps memory in draft when pending sections remain', function (): void {
@@ -90,6 +92,11 @@ it('generates a section and keeps memory in draft when pending sections remain',
         ->and($events->pluck('run_id')->unique()->count())->toBe(1)
         ->and($events->first()?->attempt)->toBe(1)
         ->and($events->last()?->attempt)->toBe(1);
+
+    assertDatabaseHas('technical_memory_generation_metrics', [
+        'technical_memory_id' => $memory->id,
+        'technical_memory_section_id' => $section->id,
+    ]);
 });
 
 it('marks memory as generated when all dynamic sections finish', function (): void {

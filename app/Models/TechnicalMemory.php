@@ -51,4 +51,10 @@ class TechnicalMemory extends Model
         return $this->hasMany(TechnicalMemoryMetricEvent::class)
             ->latest('id');
     }
+
+    public function generationMetrics(): HasMany
+    {
+        return $this->hasMany(TechnicalMemoryGenerationMetric::class)
+            ->latest('id');
+    }
 }
