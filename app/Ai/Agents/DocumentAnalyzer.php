@@ -1,7 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Ai\Agents;
 
+use App\Ai\Agents\DocumentAnalysis\DocumentAnalyzerDefinition;
+use App\Ai\Agents\DocumentAnalysis\PcaDocumentAnalyzerDefinition;
+use App\Ai\Agents\DocumentAnalysis\PptDocumentAnalyzerDefinition;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Attributes\Model;
 use Laravel\Ai\Attributes\Provider;
@@ -20,143 +25,28 @@ class DocumentAnalyzer implements Agent, HasStructuredOutput
 
     public const string MODEL_NAME = 'gpt-5.2';
 
-    public function __construct(private string $documentType = 'pca') {}
+    private readonly DocumentAnalyzerDefinition $definition;
+
+    public function __construct(string $documentType = 'pca')
+    {
+        $this->definition = self::resolveDefinition($documentType);
+    }
 
     public function instructions(): Stringable|string
     {
-        if ($this->documentType === 'pca') {
-            return <<<'INSTRUCTIONS'
-Eres un analista experto de licitaciones públicas en España.
-Analiza un documento PCA (Pliego de Cláusulas Administrativas) y extrae información accionable para preparar una memoria técnica competitiva.
-
-Debes identificar de forma exhaustiva:
-1) Datos clave de la licitación.
-2) Criterios y obligaciones administrativas.
-3) Insights estratégicos para ganar puntos en evaluación.
-
-Escribe todo en español profesional, sin inventar datos, y usando texto literal de apoyo cuando exista.
-INSTRUCTIONS;
-        }
-
-        return <<<'INSTRUCTIONS'
-Eres un analista experto de licitaciones públicas en España.
-Analiza un documento PPT (Pliego de Prescripciones Técnicas) y extrae información accionable para preparar una memoria técnica competitiva.
-
-Debes identificar de forma exhaustiva:
-1) Especificaciones técnicas obligatorias y recomendadas.
-2) Requisitos, entregables y estándares.
-3) Insights estratégicos para diferenciar la propuesta técnica.
-
-Escribe todo en español profesional, sin inventar datos, y usando texto literal de apoyo cuando exista.
-INSTRUCTIONS;
+        return $this->definition->instructions();
     }
 
     public function schema(JsonSchema $schema): array
     {
-        if ($this->documentType === 'pca') {
-            return [
-                'tender_info' => $schema->object([
-                    'title' => $schema->string()->required(),
-                    'issuing_company' => $schema->string()->required(),
-                    'reference_number' => $schema->string()->required(),
-                    'deadline_date' => $schema->string()->required(),
-                    'description' => $schema->string()->required(),
-                ])->required()->withoutAdditionalProperties(),
-                'criteria' => $schema->array()
-                    ->items($schema->object([
-                        'section_number' => $schema->string()->required(),
-                        'section_title' => $schema->string()->required(),
-                        'description' => $schema->string()->required(),
-                        'priority' => $schema->string()->enum(['mandatory', 'preferable', 'optional'])->required(),
-                        'criterion_type' => $schema->string()->enum(['judgment', 'automatic'])->required(),
-                        'score_points' => $schema->string()->required(),
-                        'metadata' => $schema->object()->withoutAdditionalProperties(),
-                    ])->withoutAdditionalProperties())
-                    ->required(),
-                'insights' => $schema->array()
-                    ->items($schema->object([
-                        'section_reference' => $schema->string()->required(),
-                        'topic' => $schema->string()->required(),
-                        'requirement_type' => $schema->string()->enum([
-                            'administrative',
-                            'technical',
-                            'budget',
-                            'timeline',
-                            'deliverable',
-                            'evaluation',
-                            'compliance',
-                            'risk',
-                        ])->required(),
-                        'importance' => $schema->string()->enum(['high', 'medium', 'low'])->required(),
-                        'statement' => $schema->string()->required(),
-                        'evidence_excerpt' => $schema->string()->required(),
-                    ])->withoutAdditionalProperties())
-                    ->required(),
-            ];
-        }
-
-        return [
-            'specifications' => $schema->array()
-                ->items($schema->object([
-                    'section_number' => $schema->string()->required(),
-                    'section_title' => $schema->string()->required(),
-                    'technical_description' => $schema->string()->required(),
-                    'requirements' => $schema->string()->required(),
-                    'deliverables' => $schema->string()->required(),
-                    'metadata' => $schema->object()->withoutAdditionalProperties(),
-                ])->withoutAdditionalProperties())
-                ->required(),
-            'insights' => $schema->array()
-                ->items($schema->object([
-                    'section_reference' => $schema->string()->required(),
-                    'topic' => $schema->string()->required(),
-                    'requirement_type' => $schema->string()->enum([
-                        'administrative',
-                        'technical',
-                        'budget',
-                        'timeline',
-                        'deliverable',
-                        'evaluation',
-                        'compliance',
-                        'risk',
-                    ])->required(),
-                    'importance' => $schema->string()->enum(['high', 'medium', 'low'])->required(),
-                    'statement' => $schema->string()->required(),
-                    'evidence_excerpt' => $schema->string()->required(),
-                ])->withoutAdditionalProperties())
-                ->required(),
-        ];
+        return $this->definition->schema($schema);
     }
 
     public function analyze(string $content): array
     {
         $response = $this->prompt($content);
 
-        if ($this->documentType === 'pca') {
-            return [
-                'tender_info' => $this->value($response, 'tender_info', []),
-                'criteria' => $this->value($response, 'criteria', []),
-                'insights' => $this->value($response, 'insights', []),
-            ];
-        }
-
-        return [
-            'specifications' => $this->value($response, 'specifications', []),
-            'insights' => $this->value($response, 'insights', []),
-        ];
-    }
-
-    private function value(mixed $response, string $key, mixed $default): mixed
-    {
-        if (is_array($response)) {
-            return $response[$key] ?? $default;
-        }
-
-        if ($response instanceof \ArrayAccess) {
-            return $response[$key] ?? $default;
-        }
-
-        return $default;
+        return $this->definition->normalizeResponse($response);
     }
 
     public function modelName(): string
@@ -167,5 +57,13 @@ INSTRUCTIONS;
     public function estimateInputChars(string $content): int
     {
         return mb_strlen($content);
+    }
+
+    private static function resolveDefinition(string $documentType): DocumentAnalyzerDefinition
+    {
+        return match ($documentType) {
+            'pca' => new PcaDocumentAnalyzerDefinition,
+            default => new PptDocumentAnalyzerDefinition,
+        };
     }
 }
