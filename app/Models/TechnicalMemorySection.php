@@ -6,6 +6,7 @@ use App\Enums\TechnicalMemorySectionStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TechnicalMemorySection extends Model
 {
@@ -40,5 +41,11 @@ class TechnicalMemorySection extends Model
     public function technicalMemory(): BelongsTo
     {
         return $this->belongsTo(TechnicalMemory::class);
+    }
+
+    public function metricEvents(): HasMany
+    {
+        return $this->hasMany(TechnicalMemoryMetricEvent::class)
+            ->latest('id');
     }
 }

@@ -39,4 +39,16 @@ class TechnicalMemory extends Model
             ->orderBy('sort_order')
             ->orderBy('id');
     }
+
+    public function metricRuns(): HasMany
+    {
+        return $this->hasMany(TechnicalMemoryMetricRun::class)
+            ->latest('id');
+    }
+
+    public function metricEvents(): HasMany
+    {
+        return $this->hasMany(TechnicalMemoryMetricEvent::class)
+            ->latest('id');
+    }
 }
