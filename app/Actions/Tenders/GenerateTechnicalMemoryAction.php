@@ -151,6 +151,7 @@ final class GenerateTechnicalMemoryAction
                 technicalMemorySectionId: $section->id,
                 section: $group,
                 context: $generationContext,
+                runId: (string) $generationContext->runId,
             );
         }
     }

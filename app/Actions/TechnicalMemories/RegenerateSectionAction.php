@@ -81,6 +81,7 @@ final class RegenerateSectionAction
             technicalMemorySectionId: $section->id,
             section: $sectionData,
             context: $context,
+            runId: (string) $context->runId,
         );
     }
 

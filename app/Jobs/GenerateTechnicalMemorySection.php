@@ -30,6 +30,7 @@ class GenerateTechnicalMemorySection implements ShouldQueue
         public TechnicalMemorySectionData $section,
         public TechnicalMemoryGenerationContextData $context,
         public int $qualityAttempt = 0,
+        public string $runId = '',
     ) {}
 
     public function handle(): void
@@ -44,9 +45,13 @@ class GenerateTechnicalMemorySection implements ShouldQueue
             return;
         }
 
-        $context = $this->context->runId !== null && $this->context->runId !== ''
-            ? $this->context
-            : $this->context->withRunId((string) Str::uuid());
+        $resolvedRunId = $this->runId !== ''
+            ? $this->runId
+            : ($this->context->runId !== null && $this->context->runId !== ''
+                ? (string) $this->context->runId
+                : (string) Str::uuid());
+
+        $context = $this->context->withRunId($resolvedRunId);
 
         $memory = $section->technicalMemory;
         $recordMetricEvent = new RecordMetricEventAction;
@@ -175,6 +180,7 @@ class GenerateTechnicalMemorySection implements ShouldQueue
                         section: $this->section,
                         context: $context->withQualityFeedback($qualityFeedback),
                         qualityAttempt: $this->qualityAttempt + 1,
+                        runId: $resolvedRunId,
                     );
 
                     $recordMetricEvent(

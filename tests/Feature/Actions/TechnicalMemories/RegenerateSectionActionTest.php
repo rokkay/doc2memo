@@ -11,6 +11,7 @@ use App\Models\TechnicalMemorySection;
 use App\Models\Tender;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
@@ -43,6 +44,19 @@ it('resets and requeues a single section regeneration', function (): void {
         'score_points' => 16,
     ]);
 
+    $existingRunId = (string) Str::uuid();
+
+    $memory->metricRuns()->create([
+        'run_id' => $existingRunId,
+        'trigger' => 'section_regeneration',
+        'status' => 'completed',
+        'sections_total' => 1,
+        'sections_completed' => 1,
+        'sections_failed' => 0,
+        'sections_retried' => 0,
+        'duration_ms' => 100,
+    ]);
+
     (new RegenerateSectionAction)($memory, $section);
 
     $section = $section->fresh();
@@ -55,7 +69,10 @@ it('resets and requeues a single section regeneration', function (): void {
 
     Queue::assertPushed(GenerateTechnicalMemorySection::class, function (GenerateTechnicalMemorySection $job) use ($section): bool {
         return $job->technicalMemorySectionId === $section?->id
+            && $job->runId !== ''
             && is_string($job->context->runId)
-            && $job->context->runId !== '';
+            && $job->context->runId === $job->runId;
     });
+
+    expect($memory?->metricRuns()->latest('id')->value('run_id'))->not->toBe($existingRunId);
 });

@@ -206,12 +206,14 @@ it('propagates one run id to every section generation job in a full generation',
     $jobs = Queue::pushed(GenerateTechnicalMemorySection::class);
 
     $runIds = $jobs
-        ->map(fn (GenerateTechnicalMemorySection $queuedJob): ?string => $queuedJob->context->runId)
+        ->map(fn (GenerateTechnicalMemorySection $queuedJob): ?string => $queuedJob->runId)
         ->filter(fn (?string $runId): bool => is_string($runId) && $runId !== '')
         ->unique()
         ->values();
 
     expect($jobs)->toHaveCount(2)
         ->and($runIds)->toHaveCount(1)
-        ->and($runIds->first())->not->toBe('');
+        ->and($runIds->first())->not->toBe('')
+        ->and($jobs->first()->runId)->toBe($jobs->last()->runId)
+        ->and($jobs->first()->context->runId)->toBe($jobs->first()->runId);
 });
