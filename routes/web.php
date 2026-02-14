@@ -3,7 +3,6 @@
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\TechnicalMemoryController;
 use App\Http\Controllers\TenderController;
-use App\Livewire\TechnicalMemories\OperationalMetrics;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -33,5 +32,5 @@ Route::get('technical-memories/{technicalMemory}/download', [TechnicalMemoryCont
 Route::get('technical-memories/{technicalMemory}/download-markdown', [TechnicalMemoryController::class, 'downloadMarkdown'])
     ->name('technical-memories.download-markdown');
 
-Route::livewire('technical-memories/operational-metrics', OperationalMetrics::class)
+Route::get('technical-memories/operational-metrics', static fn () => view('technical-memories.operational-metrics'))
     ->name('technical-memories.operational-metrics');
