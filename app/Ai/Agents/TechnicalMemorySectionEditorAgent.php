@@ -20,6 +20,8 @@ class TechnicalMemorySectionEditorAgent implements Agent, HasStructuredOutput
 {
     use Promptable;
 
+    public const string MODEL_NAME = 'gpt-5-mini';
+
     /**
      * @param  array<string,mixed>  $section
      */
@@ -62,6 +64,16 @@ INSTRUCTIONS;
         $sanitized = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $editedContent);
 
         return trim($sanitized ?? $editedContent);
+    }
+
+    public function modelName(): string
+    {
+        return self::MODEL_NAME;
+    }
+
+    public function estimateInputChars(string $content): int
+    {
+        return mb_strlen($this->promptText($content));
     }
 
     private function promptText(string $content): string

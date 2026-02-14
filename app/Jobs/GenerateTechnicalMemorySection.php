@@ -9,7 +9,10 @@ use App\Ai\Agents\TechnicalMemorySectionEditorAgent;
 use App\Data\TechnicalMemoryGenerationContextData;
 use App\Data\TechnicalMemorySectionData;
 use App\Enums\TechnicalMemorySectionStatus;
+use App\Models\TechnicalMemory;
+use App\Models\TechnicalMemoryGenerationMetric;
 use App\Models\TechnicalMemorySection;
+use App\Support\TechnicalMemoryCostEstimator;
 use App\Support\TechnicalMemoryMetrics;
 use App\Support\TechnicalMemorySectionQualityGate;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -52,6 +55,9 @@ class GenerateTechnicalMemorySection implements ShouldQueue
         $usedStyleEditor = (bool) config('technical_memory.style_editor.enabled', true);
         $outputChars = null;
         $outputH3Count = null;
+        $modelName = TechnicalMemoryDynamicSectionAgent::MODEL_NAME;
+        $estimatedInputChars = 0;
+        $costEstimator = resolve(TechnicalMemoryCostEstimator::class);
 
         $recordMetricEvent(
             memory: $memory,
@@ -75,16 +81,23 @@ class GenerateTechnicalMemorySection implements ShouldQueue
         try {
             $qualityGate = new TechnicalMemorySectionQualityGate;
 
-            $content = (new TechnicalMemoryDynamicSectionAgent(
+            $dynamicAgent = new TechnicalMemoryDynamicSectionAgent(
                 section: $this->section->toArray(),
                 context: $context->toArray(),
-            ))->generate();
+            );
+
+            $modelName = $dynamicAgent->modelName();
+            $estimatedInputChars += $dynamicAgent->estimateInputChars();
+            $content = $dynamicAgent->generate();
 
             if ($usedStyleEditor) {
                 try {
-                    $editedContent = (new TechnicalMemorySectionEditorAgent(
+                    $styleEditor = new TechnicalMemorySectionEditorAgent(
                         section: $this->section->toArray(),
-                    ))->edit($content);
+                    );
+
+                    $estimatedInputChars += $styleEditor->estimateInputChars($content);
+                    $editedContent = $styleEditor->edit($content);
 
                     if ($editedContent !== '') {
                         $content = $editedContent;
@@ -137,6 +150,21 @@ class GenerateTechnicalMemorySection implements ShouldQueue
                 $maxRetryAttempts = (int) config('technical_memory.quality_gate.max_retry_attempts', 1);
 
                 if ($this->qualityAttempt < $maxRetryAttempts) {
+                    $this->persistGenerationMetric(
+                        memory: $memory,
+                        section: $section,
+                        runId: (string) $context->runId,
+                        attempt: $attempt,
+                        status: TechnicalMemorySectionStatus::Pending->value,
+                        qualityPassed: false,
+                        qualityReasons: $qualityCheck['reasons'],
+                        durationMs: $durationMs,
+                        outputChars: $outputChars,
+                        modelName: $modelName,
+                        inputChars: $estimatedInputChars,
+                        estimator: $costEstimator,
+                    );
+
                     $section->update([
                         'status' => TechnicalMemorySectionStatus::Pending,
                         'error_message' => $qualityFeedback,
@@ -176,6 +204,21 @@ class GenerateTechnicalMemorySection implements ShouldQueue
                     'error_message' => $qualityFeedback,
                 ]);
 
+                $this->persistGenerationMetric(
+                    memory: $memory,
+                    section: $section,
+                    runId: (string) $context->runId,
+                    attempt: $attempt,
+                    status: TechnicalMemorySectionStatus::Failed->value,
+                    qualityPassed: false,
+                    qualityReasons: $qualityCheck['reasons'],
+                    durationMs: $durationMs,
+                    outputChars: $outputChars,
+                    modelName: $modelName,
+                    inputChars: $estimatedInputChars,
+                    estimator: $costEstimator,
+                );
+
                 $recordMetricEvent(
                     memory: $memory,
                     section: $section,
@@ -208,6 +251,21 @@ class GenerateTechnicalMemorySection implements ShouldQueue
                 'content' => $content,
                 'error_message' => null,
             ]);
+
+            $this->persistGenerationMetric(
+                memory: $memory,
+                section: $section,
+                runId: (string) $context->runId,
+                attempt: $attempt,
+                status: TechnicalMemorySectionStatus::Completed->value,
+                qualityPassed: true,
+                qualityReasons: [],
+                durationMs: $durationMs,
+                outputChars: $outputChars,
+                modelName: $modelName,
+                inputChars: $estimatedInputChars,
+                estimator: $costEstimator,
+            );
 
             $recordMetricEvent(
                 memory: $memory,
@@ -245,6 +303,21 @@ class GenerateTechnicalMemorySection implements ShouldQueue
                 'status' => TechnicalMemorySectionStatus::Failed,
                 'error_message' => $exception->getMessage(),
             ]);
+
+            $this->persistGenerationMetric(
+                memory: $memory,
+                section: $section,
+                runId: (string) $context->runId,
+                attempt: $attempt,
+                status: TechnicalMemorySectionStatus::Failed->value,
+                qualityPassed: false,
+                qualityReasons: [$exception->getMessage()],
+                durationMs: $durationMs,
+                outputChars: $outputChars,
+                modelName: $modelName,
+                inputChars: $estimatedInputChars,
+                estimator: $costEstimator,
+            );
 
             $recordMetricEvent(
                 memory: $memory,
@@ -324,5 +397,46 @@ class GenerateTechnicalMemorySection implements ShouldQueue
         }
 
         return $lengths[$middle];
+    }
+
+    /**
+     * @param  array<int,string>  $qualityReasons
+     */
+    private function persistGenerationMetric(
+        TechnicalMemory $memory,
+        TechnicalMemorySection $section,
+        string $runId,
+        int $attempt,
+        string $status,
+        bool $qualityPassed,
+        array $qualityReasons,
+        int $durationMs,
+        ?int $outputChars,
+        string $modelName,
+        int $inputChars,
+        TechnicalMemoryCostEstimator $estimator,
+    ): void {
+        $safeOutputChars = max(0, (int) $outputChars);
+        $estimate = $estimator->estimate(
+            model: $modelName,
+            inputChars: max(0, $inputChars),
+            outputChars: $safeOutputChars,
+        );
+
+        TechnicalMemoryGenerationMetric::query()->create([
+            'technical_memory_id' => $memory->id,
+            'technical_memory_section_id' => $section->id,
+            'run_id' => $runId,
+            'attempt' => $attempt,
+            'status' => $status,
+            'quality_passed' => $qualityPassed,
+            'quality_reasons' => $qualityReasons,
+            'duration_ms' => max(0, $durationMs),
+            'output_chars' => $safeOutputChars,
+            'model_name' => $modelName,
+            'estimated_input_units' => $estimate['estimated_input_units'],
+            'estimated_output_units' => $estimate['estimated_output_units'],
+            'estimated_cost_usd' => $estimate['estimated_cost_usd'],
+        ]);
     }
 }

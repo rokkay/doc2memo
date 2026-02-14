@@ -9,6 +9,7 @@ use App\Data\TechnicalMemorySectionData;
 use App\Enums\TechnicalMemorySectionStatus;
 use App\Jobs\GenerateTechnicalMemorySection;
 use App\Models\TechnicalMemoryMetricEvent;
+use App\Models\TechnicalMemoryGenerationMetric;
 use App\Models\TechnicalMemory;
 use App\Models\TechnicalMemorySection;
 use App\Models\Tender;
@@ -97,6 +98,19 @@ it('generates a section and keeps memory in draft when pending sections remain',
         'technical_memory_id' => $memory->id,
         'technical_memory_section_id' => $section->id,
     ]);
+
+    $metric = TechnicalMemoryGenerationMetric::query()
+        ->where('technical_memory_id', $memory->id)
+        ->where('technical_memory_section_id', $section->id)
+        ->latest('id')
+        ->first();
+
+    expect($metric)->not->toBeNull()
+        ->and($metric?->attempt)->toBe(1)
+        ->and($metric?->duration_ms)->toBeGreaterThanOrEqual(0)
+        ->and($metric?->quality_passed)->toBeTrue()
+        ->and($metric?->output_chars)->toBeGreaterThan(0)
+        ->and((float) $metric?->estimated_cost_usd)->toBeGreaterThan(0.0);
 });
 
 it('marks memory as generated when all dynamic sections finish', function (): void {
@@ -219,4 +233,17 @@ it('retries once when generated section does not meet quality gate', function ()
             && is_string($job->context->runId)
             && $job->context->runId !== '';
     });
+
+    $metric = TechnicalMemoryGenerationMetric::query()
+        ->where('technical_memory_id', $memory->id)
+        ->where('technical_memory_section_id', $section->id)
+        ->latest('id')
+        ->first();
+
+    expect($metric)->not->toBeNull()
+        ->and($metric?->attempt)->toBe(1)
+        ->and($metric?->duration_ms)->toBeGreaterThanOrEqual(0)
+        ->and($metric?->quality_passed)->toBeFalse()
+        ->and($metric?->output_chars)->toBeGreaterThan(0)
+        ->and((float) $metric?->estimated_cost_usd)->toBeGreaterThan(0.0);
 });
