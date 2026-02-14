@@ -8,9 +8,9 @@ use App\Data\TechnicalMemoryGenerationContextData;
 use App\Data\TechnicalMemorySectionData;
 use App\Enums\TechnicalMemorySectionStatus;
 use App\Jobs\GenerateTechnicalMemorySection;
-use App\Models\TechnicalMemoryMetricEvent;
-use App\Models\TechnicalMemoryGenerationMetric;
 use App\Models\TechnicalMemory;
+use App\Models\TechnicalMemoryGenerationMetric;
+use App\Models\TechnicalMemoryMetricEvent;
 use App\Models\TechnicalMemorySection;
 use App\Models\Tender;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -105,12 +105,23 @@ it('generates a section and keeps memory in draft when pending sections remain',
         ->latest('id')
         ->first();
 
+    $breakdown = $metric?->agent_cost_breakdown;
+    $breakdownTotal = round(
+        (float) data_get($breakdown, 'dynamic_section.estimated_cost_usd', 0)
+        + (float) data_get($breakdown, 'style_editor.estimated_cost_usd', 0),
+        6,
+    );
+
     expect($metric)->not->toBeNull()
         ->and($metric?->attempt)->toBe(1)
         ->and($metric?->duration_ms)->toBeGreaterThanOrEqual(0)
         ->and($metric?->quality_passed)->toBeTrue()
         ->and($metric?->output_chars)->toBeGreaterThan(0)
-        ->and((float) $metric?->estimated_cost_usd)->toBeGreaterThan(0.0);
+        ->and((float) $metric?->estimated_cost_usd)->toBeGreaterThan(0.0)
+        ->and((float) $metric?->estimated_cost_usd)->toBe($breakdownTotal)
+        ->and($breakdown)->toBeArray()
+        ->and(data_get($breakdown, 'dynamic_section.status'))->toBe('completed')
+        ->and(data_get($breakdown, 'style_editor.status'))->toBe('completed');
 });
 
 it('marks memory as generated when all dynamic sections finish', function (): void {
@@ -240,10 +251,21 @@ it('retries once when generated section does not meet quality gate', function ()
         ->latest('id')
         ->first();
 
+    $breakdown = $metric?->agent_cost_breakdown;
+    $breakdownTotal = round(
+        (float) data_get($breakdown, 'dynamic_section.estimated_cost_usd', 0)
+        + (float) data_get($breakdown, 'style_editor.estimated_cost_usd', 0),
+        6,
+    );
+
     expect($metric)->not->toBeNull()
         ->and($metric?->attempt)->toBe(1)
         ->and($metric?->duration_ms)->toBeGreaterThanOrEqual(0)
         ->and($metric?->quality_passed)->toBeFalse()
         ->and($metric?->output_chars)->toBeGreaterThan(0)
-        ->and((float) $metric?->estimated_cost_usd)->toBeGreaterThan(0.0);
+        ->and((float) $metric?->estimated_cost_usd)->toBeGreaterThan(0.0)
+        ->and((float) $metric?->estimated_cost_usd)->toBe($breakdownTotal)
+        ->and($breakdown)->toBeArray()
+        ->and(data_get($breakdown, 'dynamic_section.status'))->toBe('completed')
+        ->and(data_get($breakdown, 'style_editor.status'))->toBe('completed');
 });

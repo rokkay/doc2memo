@@ -40,7 +40,20 @@
         <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Coste estimado</p>
             <p class="mt-1 text-xl font-semibold text-slate-900 dark:text-slate-100">{{ number_format((float) ($metrics['global']['estimated_cost_usd'] ?? 0), 4, ',', '.') }} USD</p>
+            <p class="mt-2 text-[11px] text-slate-600 dark:text-slate-300">Generacion: {{ number_format((float) ($metrics['global']['estimated_dynamic_cost_usd'] ?? 0), 4, ',', '.') }} USD</p>
+            <p class="text-[11px] text-slate-600 dark:text-slate-300">Edicion: {{ number_format((float) ($metrics['global']['estimated_style_editor_cost_usd'] ?? 0), 4, ',', '.') }} USD</p>
             <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Valor estimado, no facturacion real.</p>
+        </div>
+    </section>
+
+    <section>
+        <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Analisis documental</p>
+            <p class="mt-1 text-xl font-semibold text-slate-900 dark:text-slate-100">{{ number_format((float) ($metrics['global']['estimated_document_analysis_cost_usd'] ?? 0), 4, ',', '.') }} USD</p>
+            <p class="mt-2 text-[11px] text-slate-600 dark:text-slate-300">Documentos analizados: {{ (int) ($metrics['global']['analyzed_documents'] ?? 0) }}</p>
+            <p class="text-[11px] text-slate-600 dark:text-slate-300">Analyzer: {{ number_format((float) ($metrics['global']['estimated_document_analyzer_cost_usd'] ?? 0), 4, ',', '.') }} USD</p>
+            <p class="text-[11px] text-slate-600 dark:text-slate-300">Extractor dedicado: {{ number_format((float) ($metrics['global']['estimated_dedicated_extractor_cost_usd'] ?? 0), 4, ',', '.') }} USD</p>
+            <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Coste estimado del procesamiento de PCA/PPT.</p>
         </div>
     </section>
 
@@ -55,6 +68,8 @@
                         <tr>
                             <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Memoria</th>
                             <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Intentos</th>
+                            <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Generacion</th>
+                            <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Edicion</th>
                             <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Coste estimado</th>
                         </tr>
                     </thead>
@@ -63,11 +78,13 @@
                             <tr>
                                 <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ $memory['memory_title'] }}</td>
                                 <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ (int) $memory['attempts'] }}</td>
+                                <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ number_format((float) ($memory['estimated_dynamic_cost_usd'] ?? 0), 4, ',', '.') }} USD</td>
+                                <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ number_format((float) ($memory['estimated_style_editor_cost_usd'] ?? 0), 4, ',', '.') }} USD</td>
                                 <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ number_format((float) $memory['estimated_cost_usd'], 4, ',', '.') }} USD</td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="3" class="px-3 py-4 text-sm text-slate-500 dark:text-slate-400">Sin datos para el rango seleccionado.</td>
+                                <td colspan="5" class="px-3 py-4 text-sm text-slate-500 dark:text-slate-400">Sin datos para el rango seleccionado.</td>
                             </tr>
                         @endforelse
                     </tbody>

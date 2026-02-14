@@ -16,13 +16,14 @@ class OperationalMetrics extends Component
     public string $to_date = '';
 
     /**
-     * @var array{global:array<string,int|float>,dailyTrend:array<int,array<string,int|float|string>>,memories:array<int,array<string,int|float|string>>,topProblematicSections:array<int,array<string,int|float|string>>}
+     * @var array{global:array<string,int|float>,dailyTrend:array<int,array<string,int|float|string>>,memories:array<int,array<string,int|float|string>>,topProblematicSections:array<int,array<string,int|float|string>>,documentAnalysis:array<string,int|float>}
      */
     public array $metrics = [
         'global' => [],
         'dailyTrend' => [],
         'memories' => [],
         'topProblematicSections' => [],
+        'documentAnalysis' => [],
     ];
 
     public function mount(GetOperationalMetricsAction $getOperationalMetricsAction): void
@@ -59,6 +60,7 @@ class OperationalMetrics extends Component
             'dailyTrend' => $data->dailyTrend,
             'memories' => $data->memories,
             'topProblematicSections' => $data->topProblematicSections,
+            'documentAnalysis' => $data->documentAnalysis,
         ];
     }
 }

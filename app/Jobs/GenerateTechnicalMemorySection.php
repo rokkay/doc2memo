@@ -60,8 +60,18 @@ class GenerateTechnicalMemorySection implements ShouldQueue
         $usedStyleEditor = (bool) config('technical_memory.style_editor.enabled', true);
         $outputChars = null;
         $outputH3Count = null;
-        $modelName = TechnicalMemoryDynamicSectionAgent::MODEL_NAME;
-        $estimatedInputChars = 0;
+        $dynamicAgentMetrics = [
+            'model_name' => TechnicalMemoryDynamicSectionAgent::MODEL_NAME,
+            'input_chars' => 0,
+            'output_chars' => 0,
+            'status' => 'pending',
+        ];
+        $styleEditorMetrics = [
+            'model_name' => TechnicalMemorySectionEditorAgent::MODEL_NAME,
+            'input_chars' => 0,
+            'output_chars' => 0,
+            'status' => $usedStyleEditor ? 'pending' : 'skipped',
+        ];
         $costEstimator = resolve(TechnicalMemoryCostEstimator::class);
 
         $recordMetricEvent(
@@ -91,9 +101,11 @@ class GenerateTechnicalMemorySection implements ShouldQueue
                 context: $context->toArray(),
             );
 
-            $modelName = $dynamicAgent->modelName();
-            $estimatedInputChars += $dynamicAgent->estimateInputChars();
+            $dynamicAgentMetrics['model_name'] = $dynamicAgent->modelName();
+            $dynamicAgentMetrics['input_chars'] = max(0, (int) $dynamicAgent->estimateInputChars());
             $content = $dynamicAgent->generate();
+            $dynamicAgentMetrics['output_chars'] = max(0, mb_strlen(trim($content)));
+            $dynamicAgentMetrics['status'] = 'completed';
 
             if ($usedStyleEditor) {
                 try {
@@ -101,13 +113,18 @@ class GenerateTechnicalMemorySection implements ShouldQueue
                         section: $this->section->toArray(),
                     );
 
-                    $estimatedInputChars += $styleEditor->estimateInputChars($content);
+                    $styleEditorMetrics['model_name'] = $styleEditor->modelName();
+                    $styleEditorMetrics['input_chars'] = max(0, (int) $styleEditor->estimateInputChars($content));
                     $editedContent = $styleEditor->edit($content);
+                    $styleEditorMetrics['output_chars'] = max(0, mb_strlen(trim($editedContent)));
+                    $styleEditorMetrics['status'] = 'completed';
 
                     if ($editedContent !== '') {
                         $content = $editedContent;
                     }
                 } catch (Throwable $exception) {
+                    $styleEditorMetrics['status'] = 'failed';
+
                     Log::warning('Section style editor failed, using raw generated content.', [
                         'technical_memory_section_id' => $section->id,
                         'error' => $exception->getMessage(),
@@ -165,8 +182,8 @@ class GenerateTechnicalMemorySection implements ShouldQueue
                         qualityReasons: $qualityCheck['reasons'],
                         durationMs: $durationMs,
                         outputChars: $outputChars,
-                        modelName: $modelName,
-                        inputChars: $estimatedInputChars,
+                        dynamicAgentMetrics: $dynamicAgentMetrics,
+                        styleEditorMetrics: $styleEditorMetrics,
                         estimator: $costEstimator,
                     );
 
@@ -220,8 +237,8 @@ class GenerateTechnicalMemorySection implements ShouldQueue
                     qualityReasons: $qualityCheck['reasons'],
                     durationMs: $durationMs,
                     outputChars: $outputChars,
-                    modelName: $modelName,
-                    inputChars: $estimatedInputChars,
+                    dynamicAgentMetrics: $dynamicAgentMetrics,
+                    styleEditorMetrics: $styleEditorMetrics,
                     estimator: $costEstimator,
                 );
 
@@ -268,8 +285,8 @@ class GenerateTechnicalMemorySection implements ShouldQueue
                 qualityReasons: [],
                 durationMs: $durationMs,
                 outputChars: $outputChars,
-                modelName: $modelName,
-                inputChars: $estimatedInputChars,
+                dynamicAgentMetrics: $dynamicAgentMetrics,
+                styleEditorMetrics: $styleEditorMetrics,
                 estimator: $costEstimator,
             );
 
@@ -320,8 +337,8 @@ class GenerateTechnicalMemorySection implements ShouldQueue
                 qualityReasons: [$exception->getMessage()],
                 durationMs: $durationMs,
                 outputChars: $outputChars,
-                modelName: $modelName,
-                inputChars: $estimatedInputChars,
+                dynamicAgentMetrics: $dynamicAgentMetrics,
+                styleEditorMetrics: $styleEditorMetrics,
                 estimator: $costEstimator,
             );
 
@@ -407,6 +424,8 @@ class GenerateTechnicalMemorySection implements ShouldQueue
 
     /**
      * @param  array<int,string>  $qualityReasons
+     * @param  array{model_name:string,input_chars:int,output_chars:int,status:string}  $dynamicAgentMetrics
+     * @param  array{model_name:string,input_chars:int,output_chars:int,status:string}  $styleEditorMetrics
      */
     private function persistGenerationMetric(
         TechnicalMemory $memory,
@@ -418,16 +437,44 @@ class GenerateTechnicalMemorySection implements ShouldQueue
         array $qualityReasons,
         int $durationMs,
         ?int $outputChars,
-        string $modelName,
-        int $inputChars,
+        array $dynamicAgentMetrics,
+        array $styleEditorMetrics,
         TechnicalMemoryCostEstimator $estimator,
     ): void {
         $safeOutputChars = max(0, (int) $outputChars);
-        $estimate = $estimator->estimate(
-            model: $modelName,
-            inputChars: max(0, $inputChars),
-            outputChars: $safeOutputChars,
+        $dynamicEstimate = $estimator->estimate(
+            model: $dynamicAgentMetrics['model_name'],
+            inputChars: $dynamicAgentMetrics['input_chars'],
+            outputChars: $dynamicAgentMetrics['output_chars'],
         );
+        $styleEstimate = $estimator->estimate(
+            model: $styleEditorMetrics['model_name'],
+            inputChars: $styleEditorMetrics['input_chars'],
+            outputChars: $styleEditorMetrics['output_chars'],
+        );
+        $estimatedInputUnits = round($dynamicEstimate['estimated_input_units'] + $styleEstimate['estimated_input_units'], 4);
+        $estimatedOutputUnits = round($dynamicEstimate['estimated_output_units'] + $styleEstimate['estimated_output_units'], 4);
+        $estimatedCostUsd = round($dynamicEstimate['estimated_cost_usd'] + $styleEstimate['estimated_cost_usd'], 6);
+        $agentCostBreakdown = [
+            'dynamic_section' => [
+                'model_name' => $dynamicAgentMetrics['model_name'],
+                'input_chars' => $dynamicAgentMetrics['input_chars'],
+                'output_chars' => $dynamicAgentMetrics['output_chars'],
+                'estimated_input_units' => $dynamicEstimate['estimated_input_units'],
+                'estimated_output_units' => $dynamicEstimate['estimated_output_units'],
+                'estimated_cost_usd' => $dynamicEstimate['estimated_cost_usd'],
+                'status' => $dynamicAgentMetrics['status'],
+            ],
+            'style_editor' => [
+                'model_name' => $styleEditorMetrics['model_name'],
+                'input_chars' => $styleEditorMetrics['input_chars'],
+                'output_chars' => $styleEditorMetrics['output_chars'],
+                'estimated_input_units' => $styleEstimate['estimated_input_units'],
+                'estimated_output_units' => $styleEstimate['estimated_output_units'],
+                'estimated_cost_usd' => $styleEstimate['estimated_cost_usd'],
+                'status' => $styleEditorMetrics['status'],
+            ],
+        ];
 
         TechnicalMemoryGenerationMetric::query()->create([
             'technical_memory_id' => $memory->id,
@@ -439,10 +486,11 @@ class GenerateTechnicalMemorySection implements ShouldQueue
             'quality_reasons' => $qualityReasons,
             'duration_ms' => max(0, $durationMs),
             'output_chars' => $safeOutputChars,
-            'model_name' => $modelName,
-            'estimated_input_units' => $estimate['estimated_input_units'],
-            'estimated_output_units' => $estimate['estimated_output_units'],
-            'estimated_cost_usd' => $estimate['estimated_cost_usd'],
+            'model_name' => $dynamicAgentMetrics['model_name'],
+            'estimated_input_units' => $estimatedInputUnits,
+            'estimated_output_units' => $estimatedOutputUnits,
+            'estimated_cost_usd' => $estimatedCostUsd,
+            'agent_cost_breakdown' => $agentCostBreakdown,
         ]);
     }
 }

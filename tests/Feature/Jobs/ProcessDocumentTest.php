@@ -63,7 +63,13 @@ it('processes a pca markdown document and stores extracted data', function (): v
 
     (new ProcessDocument($document))->handle();
 
-    expect($document->fresh()->status)->toBe('analyzed');
+    $processedDocument = $document->fresh();
+
+    expect($processedDocument?->status)->toBe('analyzed')
+        ->and((float) $processedDocument?->estimated_analysis_cost_usd)->toBeGreaterThan(0.0)
+        ->and($processedDocument?->analysis_cost_breakdown)->toBeArray()
+        ->and(data_get($processedDocument?->analysis_cost_breakdown, 'document_analyzer.status'))->toBe('completed')
+        ->and(data_get($processedDocument?->analysis_cost_breakdown, 'dedicated_judgment_extractor.status'))->toBe('skipped');
 
     assertDatabaseHas('extracted_criteria', [
         'document_id' => $document->id,

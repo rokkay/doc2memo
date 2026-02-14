@@ -149,6 +149,14 @@ it('uses dedicated judgment criteria agent to extract over-b scoring table', fun
 
     (new ProcessDocumentAction)($document);
 
+    $processedDocument = $document->fresh();
+
+    expect($processedDocument)->not->toBeNull()
+        ->and((float) $processedDocument?->estimated_analysis_cost_usd)->toBeGreaterThan(0.0)
+        ->and(data_get($processedDocument?->analysis_cost_breakdown, 'document_analyzer.status'))->toBe('completed')
+        ->and(data_get($processedDocument?->analysis_cost_breakdown, 'dedicated_judgment_extractor.status'))->toBe('completed')
+        ->and((float) data_get($processedDocument?->analysis_cost_breakdown, 'dedicated_judgment_extractor.estimated_cost_usd'))->toBeGreaterThan(0.0);
+
     $judgmentCount = \App\Models\ExtractedCriterion::query()
         ->where('document_id', $document->id)
         ->where('criterion_type', 'judgment')

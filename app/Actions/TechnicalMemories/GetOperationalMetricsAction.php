@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\TechnicalMemories;
 
 use App\Data\TechnicalMemoryOperationalMetricsData;
+use App\Models\Document;
 use App\Models\TechnicalMemoryGenerationMetric;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
@@ -18,12 +19,17 @@ final class GetOperationalMetricsAction
             ->whereBetween('created_at', [$from, $to])
             ->orderBy('created_at')
             ->get();
+        $documents = Document::query()
+            ->whereBetween('analyzed_at', [$from, $to])
+            ->orderBy('analyzed_at')
+            ->get();
 
         return new TechnicalMemoryOperationalMetricsData(
-            global: $this->buildGlobalKpis($metrics),
+            global: $this->buildGlobalKpis($metrics, $documents),
             dailyTrend: $this->buildDailyTrend($metrics),
             memories: $this->buildMemorySummaries($metrics),
             topProblematicSections: $this->buildTopProblematicSections($metrics),
+            documentAnalysis: $this->buildDocumentAnalysisSummary($documents),
         );
     }
 
@@ -31,13 +37,18 @@ final class GetOperationalMetricsAction
      * @param  Collection<int,TechnicalMemoryGenerationMetric>  $metrics
      * @return array<string,int|float>
      */
-    private function buildGlobalKpis(Collection $metrics): array
+    private function buildGlobalKpis(Collection $metrics, Collection $documents): array
     {
         $attempts = $metrics->count();
         $firstPassCount = $metrics->where('status', 'completed')->where('attempt', 1)->count();
         $retryCount = $metrics->filter(fn (TechnicalMemoryGenerationMetric $metric): bool => $metric->attempt > 1)->count();
         $failureCount = $metrics->where('status', 'failed')->count();
         $avgDurationMs = $attempts > 0 ? (int) round((float) $metrics->avg('duration_ms')) : 0;
+        $dynamicSectionCostUsd = $this->sumAgentCost($metrics, 'dynamic_section');
+        $styleEditorCostUsd = $this->sumAgentCost($metrics, 'style_editor');
+        $documentAnalysisCostUsd = round((float) $documents->sum('estimated_analysis_cost_usd'), 6);
+        $documentAnalyzerCostUsd = $this->sumDocumentAgentCost($documents, 'document_analyzer');
+        $dedicatedExtractorCostUsd = $this->sumDocumentAgentCost($documents, 'dedicated_judgment_extractor');
 
         return [
             'attempts' => $attempts,
@@ -47,6 +58,12 @@ final class GetOperationalMetricsAction
             'avg_duration_ms' => $avgDurationMs,
             'p95_duration_ms' => $this->p95Duration($metrics),
             'estimated_cost_usd' => round((float) $metrics->sum('estimated_cost_usd'), 6),
+            'estimated_dynamic_cost_usd' => $dynamicSectionCostUsd,
+            'estimated_style_editor_cost_usd' => $styleEditorCostUsd,
+            'analyzed_documents' => $documents->count(),
+            'estimated_document_analysis_cost_usd' => $documentAnalysisCostUsd,
+            'estimated_document_analyzer_cost_usd' => $documentAnalyzerCostUsd,
+            'estimated_dedicated_extractor_cost_usd' => $dedicatedExtractorCostUsd,
         ];
     }
 
@@ -63,6 +80,8 @@ final class GetOperationalMetricsAction
                 $firstPass = $dayMetrics->where('status', 'completed')->where('attempt', 1)->count();
                 $retries = $dayMetrics->filter(fn (TechnicalMemoryGenerationMetric $metric): bool => $metric->attempt > 1)->count();
                 $failures = $dayMetrics->where('status', 'failed')->count();
+                $dynamicSectionCostUsd = $this->sumAgentCost($dayMetrics, 'dynamic_section');
+                $styleEditorCostUsd = $this->sumAgentCost($dayMetrics, 'style_editor');
 
                 return [
                     'date' => $date,
@@ -71,6 +90,8 @@ final class GetOperationalMetricsAction
                     'retry_rate' => $this->rate($retries, $attempts),
                     'failure_rate' => $this->rate($failures, $attempts),
                     'estimated_cost_usd' => round((float) $dayMetrics->sum('estimated_cost_usd'), 6),
+                    'estimated_dynamic_cost_usd' => $dynamicSectionCostUsd,
+                    'estimated_style_editor_cost_usd' => $styleEditorCostUsd,
                 ];
             })
             ->sortBy('date')
@@ -88,6 +109,8 @@ final class GetOperationalMetricsAction
             ->groupBy('technical_memory_id')
             ->map(function (Collection $memoryMetrics, int $memoryId): array {
                 $first = $memoryMetrics->first();
+                $dynamicSectionCostUsd = $this->sumAgentCost($memoryMetrics, 'dynamic_section');
+                $styleEditorCostUsd = $this->sumAgentCost($memoryMetrics, 'style_editor');
 
                 return [
                     'technical_memory_id' => $memoryId,
@@ -97,6 +120,8 @@ final class GetOperationalMetricsAction
                     'failed' => $memoryMetrics->where('status', 'failed')->count(),
                     'retried' => $memoryMetrics->filter(fn (TechnicalMemoryGenerationMetric $metric): bool => $metric->attempt > 1)->count(),
                     'estimated_cost_usd' => round((float) $memoryMetrics->sum('estimated_cost_usd'), 6),
+                    'estimated_dynamic_cost_usd' => $dynamicSectionCostUsd,
+                    'estimated_style_editor_cost_usd' => $styleEditorCostUsd,
                 ];
             })
             ->sortByDesc('attempts')
@@ -160,5 +185,51 @@ final class GetOperationalMetricsAction
         $rank = (int) ceil($count * 0.95);
 
         return $values[max(0, $rank - 1)];
+    }
+
+    /**
+     * @param  Collection<int,Document>  $documents
+     * @return array<string,int|float>
+     */
+    private function buildDocumentAnalysisSummary(Collection $documents): array
+    {
+        return [
+            'documents' => $documents->count(),
+            'estimated_cost_usd' => round((float) $documents->sum('estimated_analysis_cost_usd'), 6),
+            'estimated_document_analyzer_cost_usd' => $this->sumDocumentAgentCost($documents, 'document_analyzer'),
+            'estimated_dedicated_extractor_cost_usd' => $this->sumDocumentAgentCost($documents, 'dedicated_judgment_extractor'),
+        ];
+    }
+
+    /**
+     * @param  Collection<int,TechnicalMemoryGenerationMetric>  $metrics
+     */
+    private function sumAgentCost(Collection $metrics, string $agentKey): float
+    {
+        return round((float) $metrics->sum(function (TechnicalMemoryGenerationMetric $metric) use ($agentKey): float {
+            $breakdown = $metric->agent_cost_breakdown;
+
+            if (is_array($breakdown)) {
+                return (float) data_get($breakdown, $agentKey.'.estimated_cost_usd', 0.0);
+            }
+
+            return 0.0;
+        }), 6);
+    }
+
+    /**
+     * @param  Collection<int,Document>  $documents
+     */
+    private function sumDocumentAgentCost(Collection $documents, string $agentKey): float
+    {
+        return round((float) $documents->sum(function (Document $document) use ($agentKey): float {
+            $breakdown = $document->analysis_cost_breakdown;
+
+            if (is_array($breakdown)) {
+                return (float) data_get($breakdown, $agentKey.'.estimated_cost_usd', 0.0);
+            }
+
+            return 0.0;
+        }), 6);
     }
 }

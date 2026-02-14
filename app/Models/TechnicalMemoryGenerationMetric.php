@@ -24,6 +24,7 @@ class TechnicalMemoryGenerationMetric extends Model
         'estimated_input_units',
         'estimated_output_units',
         'estimated_cost_usd',
+        'agent_cost_breakdown',
     ];
 
     protected function casts(): array
@@ -37,6 +38,7 @@ class TechnicalMemoryGenerationMetric extends Model
             'estimated_input_units' => 'decimal:4',
             'estimated_output_units' => 'decimal:4',
             'estimated_cost_usd' => 'decimal:6',
+            'agent_cost_breakdown' => 'array',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];

@@ -21,6 +21,10 @@ class Document extends Model
         'mime_type',
         'status',
         'insights_count',
+        'estimated_analysis_input_units',
+        'estimated_analysis_output_units',
+        'estimated_analysis_cost_usd',
+        'analysis_cost_breakdown',
         'extracted_text',
         'processing_error',
         'analyzed_at',
@@ -31,6 +35,10 @@ class Document extends Model
         return [
             'analyzed_at' => 'datetime',
             'insights_count' => 'integer',
+            'estimated_analysis_input_units' => 'decimal:4',
+            'estimated_analysis_output_units' => 'decimal:4',
+            'estimated_analysis_cost_usd' => 'decimal:6',
+            'analysis_cost_breakdown' => 'array',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];

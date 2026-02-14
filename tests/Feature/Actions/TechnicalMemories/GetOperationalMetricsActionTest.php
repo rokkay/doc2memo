@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Actions\TechnicalMemories\GetOperationalMetricsAction;
+use App\Models\Document;
 use App\Models\TechnicalMemory;
 use App\Models\TechnicalMemoryGenerationMetric;
 use App\Models\TechnicalMemorySection;
@@ -54,6 +55,10 @@ it('calculates global kpis durations and per memory rollups', function (): void 
         'estimated_input_units' => 0.001,
         'estimated_output_units' => 0.001,
         'estimated_cost_usd' => 0.1,
+        'agent_cost_breakdown' => [
+            'dynamic_section' => ['estimated_cost_usd' => 0.07],
+            'style_editor' => ['estimated_cost_usd' => 0.03],
+        ],
         'created_at' => CarbonImmutable::parse('2026-02-10 10:00:00'),
         'updated_at' => CarbonImmutable::parse('2026-02-10 10:00:00'),
     ]);
@@ -72,6 +77,10 @@ it('calculates global kpis durations and per memory rollups', function (): void 
         'estimated_input_units' => 0.001,
         'estimated_output_units' => 0.001,
         'estimated_cost_usd' => 0.2,
+        'agent_cost_breakdown' => [
+            'dynamic_section' => ['estimated_cost_usd' => 0.14],
+            'style_editor' => ['estimated_cost_usd' => 0.06],
+        ],
         'created_at' => CarbonImmutable::parse('2026-02-10 10:05:00'),
         'updated_at' => CarbonImmutable::parse('2026-02-10 10:05:00'),
     ]);
@@ -90,6 +99,10 @@ it('calculates global kpis durations and per memory rollups', function (): void 
         'estimated_input_units' => 0.001,
         'estimated_output_units' => 0.001,
         'estimated_cost_usd' => 0.15,
+        'agent_cost_breakdown' => [
+            'dynamic_section' => ['estimated_cost_usd' => 0.1],
+            'style_editor' => ['estimated_cost_usd' => 0.05],
+        ],
         'created_at' => CarbonImmutable::parse('2026-02-11 11:00:00'),
         'updated_at' => CarbonImmutable::parse('2026-02-11 11:00:00'),
     ]);
@@ -108,8 +121,26 @@ it('calculates global kpis durations and per memory rollups', function (): void 
         'estimated_input_units' => 0.001,
         'estimated_output_units' => 0.001,
         'estimated_cost_usd' => 0.05,
+        'agent_cost_breakdown' => [
+            'dynamic_section' => ['estimated_cost_usd' => 0.04],
+            'style_editor' => ['estimated_cost_usd' => 0.01],
+        ],
         'created_at' => CarbonImmutable::parse('2026-02-11 12:00:00'),
         'updated_at' => CarbonImmutable::parse('2026-02-11 12:00:00'),
+    ]);
+
+    Document::factory()->create([
+        'tender_id' => $tender->id,
+        'document_type' => 'pca',
+        'status' => 'analyzed',
+        'estimated_analysis_input_units' => 0.004,
+        'estimated_analysis_output_units' => 0.001,
+        'estimated_analysis_cost_usd' => 0.09,
+        'analysis_cost_breakdown' => [
+            'document_analyzer' => ['estimated_cost_usd' => 0.06],
+            'dedicated_judgment_extractor' => ['estimated_cost_usd' => 0.03],
+        ],
+        'analyzed_at' => CarbonImmutable::parse('2026-02-11 13:00:00'),
     ]);
 
     $result = (new GetOperationalMetricsAction)(
@@ -123,9 +154,19 @@ it('calculates global kpis durations and per memory rollups', function (): void 
         ->and($result->global['avg_duration_ms'])->toBe(1625)
         ->and($result->global['p95_duration_ms'])->toBe(3000)
         ->and($result->global['estimated_cost_usd'])->toBe(0.5)
+        ->and($result->global['estimated_dynamic_cost_usd'])->toBe(0.35)
+        ->and($result->global['estimated_style_editor_cost_usd'])->toBe(0.15)
+        ->and($result->global['analyzed_documents'])->toBe(1)
+        ->and($result->global['estimated_document_analysis_cost_usd'])->toBe(0.09)
+        ->and($result->global['estimated_document_analyzer_cost_usd'])->toBe(0.06)
+        ->and($result->global['estimated_dedicated_extractor_cost_usd'])->toBe(0.03)
         ->and($result->memories[0]['technical_memory_id'])->toBe($memoryA->id)
         ->and($result->memories[0]['attempts'])->toBe(3)
         ->and($result->memories[0]['estimated_cost_usd'])->toBe(0.45)
+        ->and($result->memories[0]['estimated_dynamic_cost_usd'])->toBe(0.31)
+        ->and($result->memories[0]['estimated_style_editor_cost_usd'])->toBe(0.14)
+        ->and($result->documentAnalysis['documents'])->toBe(1)
+        ->and($result->documentAnalysis['estimated_cost_usd'])->toBe(0.09)
         ->and($result->topProblematicSections[0]['section_title'])->toBe('Section B');
 });
 
@@ -148,6 +189,10 @@ it('filters metrics by date range', function (): void {
         'estimated_input_units' => 0.001,
         'estimated_output_units' => 0.001,
         'estimated_cost_usd' => 0.2,
+        'agent_cost_breakdown' => [
+            'dynamic_section' => ['estimated_cost_usd' => 0.14],
+            'style_editor' => ['estimated_cost_usd' => 0.06],
+        ],
         'created_at' => CarbonImmutable::parse('2026-02-10 10:00:00'),
         'updated_at' => CarbonImmutable::parse('2026-02-10 10:00:00'),
     ]);
@@ -166,8 +211,40 @@ it('filters metrics by date range', function (): void {
         'estimated_input_units' => 0.001,
         'estimated_output_units' => 0.001,
         'estimated_cost_usd' => 0.3,
+        'agent_cost_breakdown' => [
+            'dynamic_section' => ['estimated_cost_usd' => 0.21],
+            'style_editor' => ['estimated_cost_usd' => 0.09],
+        ],
         'created_at' => CarbonImmutable::parse('2026-02-11 10:00:00'),
         'updated_at' => CarbonImmutable::parse('2026-02-11 10:00:00'),
+    ]);
+
+    Document::factory()->create([
+        'tender_id' => $tender->id,
+        'document_type' => 'ppt',
+        'status' => 'analyzed',
+        'estimated_analysis_input_units' => 0.005,
+        'estimated_analysis_output_units' => 0.002,
+        'estimated_analysis_cost_usd' => 0.12,
+        'analysis_cost_breakdown' => [
+            'document_analyzer' => ['estimated_cost_usd' => 0.12],
+            'dedicated_judgment_extractor' => ['estimated_cost_usd' => 0.0],
+        ],
+        'analyzed_at' => CarbonImmutable::parse('2026-02-10 08:00:00'),
+    ]);
+
+    Document::factory()->create([
+        'tender_id' => $tender->id,
+        'document_type' => 'pca',
+        'status' => 'analyzed',
+        'estimated_analysis_input_units' => 0.006,
+        'estimated_analysis_output_units' => 0.002,
+        'estimated_analysis_cost_usd' => 0.18,
+        'analysis_cost_breakdown' => [
+            'document_analyzer' => ['estimated_cost_usd' => 0.13],
+            'dedicated_judgment_extractor' => ['estimated_cost_usd' => 0.05],
+        ],
+        'analyzed_at' => CarbonImmutable::parse('2026-02-11 08:00:00'),
     ]);
 
     $result = (new GetOperationalMetricsAction)(
@@ -177,5 +254,11 @@ it('filters metrics by date range', function (): void {
 
     expect($result->global['attempts'])->toBe(1)
         ->and($result->global['estimated_cost_usd'])->toBe(0.3)
+        ->and($result->global['estimated_dynamic_cost_usd'])->toBe(0.21)
+        ->and($result->global['estimated_style_editor_cost_usd'])->toBe(0.09)
+        ->and($result->global['analyzed_documents'])->toBe(1)
+        ->and($result->global['estimated_document_analysis_cost_usd'])->toBe(0.18)
+        ->and($result->global['estimated_document_analyzer_cost_usd'])->toBe(0.13)
+        ->and($result->global['estimated_dedicated_extractor_cost_usd'])->toBe(0.05)
         ->and($result->dailyTrend)->toHaveCount(1);
 });

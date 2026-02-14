@@ -20,6 +20,8 @@ class PcaJudgmentCriteriaExtractorAgent implements Agent, HasStructuredOutput
 {
     use Promptable;
 
+    public const string MODEL_NAME = 'gpt-5.2';
+
     public function instructions(): Stringable|string
     {
         return <<<'INSTRUCTIONS'
@@ -70,5 +72,15 @@ INSTRUCTIONS;
         }
 
         return [];
+    }
+
+    public function modelName(): string
+    {
+        return self::MODEL_NAME;
+    }
+
+    public function estimateInputChars(string $content): int
+    {
+        return mb_strlen($content);
     }
 }
