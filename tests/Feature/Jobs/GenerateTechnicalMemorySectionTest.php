@@ -271,3 +271,69 @@ it('retries once when generated section does not meet quality gate', function ()
         ->and(data_get($breakdown, 'dynamic_section.status'))->toBe('completed')
         ->and(data_get($breakdown, 'style_editor.status'))->toBe('completed');
 });
+
+it('persists skipped style editor metrics and keeps total cost aligned with breakdown', function (): void {
+    config()->set('technical_memory.style_editor.enabled', false);
+
+    $tender = Tender::factory()->create();
+
+    $memory = TechnicalMemory::factory()->create([
+        'tender_id' => $tender->id,
+        'status' => 'draft',
+    ]);
+
+    $section = TechnicalMemorySection::factory()->create([
+        'technical_memory_id' => $memory->id,
+        'section_title' => 'Metodología',
+        'status' => 'pending',
+        'content' => null,
+    ]);
+
+    $richContent = "### Metodología de trabajo\n\n"
+        .str_repeat('Se propone una ejecución con hitos verificables y trazabilidad documental de cada entrega. ', 16)
+        ."\n\n### Control y calidad\n\n"
+        .str_repeat('La planificación incorpora controles de calidad y evidencias periódicas para asegurar cumplimiento. ', 12);
+
+    TechnicalMemoryDynamicSectionAgent::fake([
+        ['content' => $richContent],
+        ['content' => $richContent],
+    ])->preventStrayPrompts();
+
+    (new GenerateTechnicalMemorySection(
+        technicalMemorySectionId: $section->id,
+        section: TechnicalMemorySectionData::fromArray([
+            'group_key' => '1.1-metodologia',
+            'section_number' => '1.1',
+            'section_title' => 'Metodología',
+            'total_points' => 10,
+            'criteria_count' => 1,
+            'criteria' => [],
+            'sort_key' => '0001.0001|metodologia',
+        ]),
+        context: TechnicalMemoryGenerationContextData::fromArray([
+            'pca' => ['criteria' => []],
+            'ppt' => ['specifications' => []],
+            'memory_title' => 'Memoria test',
+        ]),
+    ))->handle();
+
+    $metric = TechnicalMemoryGenerationMetric::query()
+        ->where('technical_memory_id', $memory->id)
+        ->where('technical_memory_section_id', $section->id)
+        ->latest('id')
+        ->first();
+
+    $breakdown = $metric?->agent_cost_breakdown;
+    $breakdownTotal = round(
+        (float) data_get($breakdown, 'dynamic_section.estimated_cost_usd', 0)
+        + (float) data_get($breakdown, 'style_editor.estimated_cost_usd', 0),
+        6,
+    );
+
+    expect($metric)->not->toBeNull()
+        ->and($breakdown)->toBeArray()
+        ->and(data_get($breakdown, 'dynamic_section.status'))->toBe('completed')
+        ->and(data_get($breakdown, 'style_editor.status'))->toBe('skipped')
+        ->and((float) data_get($breakdown, 'style_editor.estimated_cost_usd'))->toBe(0.0)
+        ->and((float) $metric?->estimated_cost_usd)->toBe($breakdownTotal);
+});

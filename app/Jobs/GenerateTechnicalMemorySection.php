@@ -6,13 +6,14 @@ use App\Actions\TechnicalMemories\RecordMetricEventAction;
 use App\Actions\TechnicalMemories\UpsertMetricRunSummaryAction;
 use App\Ai\Agents\TechnicalMemoryDynamicSectionAgent;
 use App\Ai\Agents\TechnicalMemorySectionEditorAgent;
+use App\Data\AiAgentRunMetricsData;
 use App\Data\TechnicalMemoryGenerationContextData;
 use App\Data\TechnicalMemorySectionData;
 use App\Enums\TechnicalMemorySectionStatus;
 use App\Models\TechnicalMemory;
 use App\Models\TechnicalMemoryGenerationMetric;
 use App\Models\TechnicalMemorySection;
-use App\Support\TechnicalMemoryCostEstimator;
+use App\Support\AiCostBreakdownCalculator;
 use App\Support\TechnicalMemoryMetrics;
 use App\Support\TechnicalMemorySectionQualityGate;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -72,7 +73,7 @@ class GenerateTechnicalMemorySection implements ShouldQueue
             'output_chars' => 0,
             'status' => $usedStyleEditor ? 'pending' : 'skipped',
         ];
-        $costEstimator = resolve(TechnicalMemoryCostEstimator::class);
+        $costBreakdownCalculator = resolve(AiCostBreakdownCalculator::class);
 
         $recordMetricEvent(
             memory: $memory,
@@ -184,7 +185,7 @@ class GenerateTechnicalMemorySection implements ShouldQueue
                         outputChars: $outputChars,
                         dynamicAgentMetrics: $dynamicAgentMetrics,
                         styleEditorMetrics: $styleEditorMetrics,
-                        estimator: $costEstimator,
+                        costBreakdownCalculator: $costBreakdownCalculator,
                     );
 
                     $section->update([
@@ -239,7 +240,7 @@ class GenerateTechnicalMemorySection implements ShouldQueue
                     outputChars: $outputChars,
                     dynamicAgentMetrics: $dynamicAgentMetrics,
                     styleEditorMetrics: $styleEditorMetrics,
-                    estimator: $costEstimator,
+                    costBreakdownCalculator: $costBreakdownCalculator,
                 );
 
                 $recordMetricEvent(
@@ -287,7 +288,7 @@ class GenerateTechnicalMemorySection implements ShouldQueue
                 outputChars: $outputChars,
                 dynamicAgentMetrics: $dynamicAgentMetrics,
                 styleEditorMetrics: $styleEditorMetrics,
-                estimator: $costEstimator,
+                costBreakdownCalculator: $costBreakdownCalculator,
             );
 
             $recordMetricEvent(
@@ -339,7 +340,7 @@ class GenerateTechnicalMemorySection implements ShouldQueue
                 outputChars: $outputChars,
                 dynamicAgentMetrics: $dynamicAgentMetrics,
                 styleEditorMetrics: $styleEditorMetrics,
-                estimator: $costEstimator,
+                costBreakdownCalculator: $costBreakdownCalculator,
             );
 
             $recordMetricEvent(
@@ -439,42 +440,25 @@ class GenerateTechnicalMemorySection implements ShouldQueue
         ?int $outputChars,
         array $dynamicAgentMetrics,
         array $styleEditorMetrics,
-        TechnicalMemoryCostEstimator $estimator,
+        AiCostBreakdownCalculator $costBreakdownCalculator,
     ): void {
         $safeOutputChars = max(0, (int) $outputChars);
-        $dynamicEstimate = $estimator->estimate(
-            model: $dynamicAgentMetrics['model_name'],
-            inputChars: $dynamicAgentMetrics['input_chars'],
-            outputChars: $dynamicAgentMetrics['output_chars'],
-        );
-        $styleEstimate = $estimator->estimate(
-            model: $styleEditorMetrics['model_name'],
-            inputChars: $styleEditorMetrics['input_chars'],
-            outputChars: $styleEditorMetrics['output_chars'],
-        );
-        $estimatedInputUnits = round($dynamicEstimate['estimated_input_units'] + $styleEstimate['estimated_input_units'], 4);
-        $estimatedOutputUnits = round($dynamicEstimate['estimated_output_units'] + $styleEstimate['estimated_output_units'], 4);
-        $estimatedCostUsd = round($dynamicEstimate['estimated_cost_usd'] + $styleEstimate['estimated_cost_usd'], 6);
-        $agentCostBreakdown = [
-            'dynamic_section' => [
-                'model_name' => $dynamicAgentMetrics['model_name'],
-                'input_chars' => $dynamicAgentMetrics['input_chars'],
-                'output_chars' => $dynamicAgentMetrics['output_chars'],
-                'estimated_input_units' => $dynamicEstimate['estimated_input_units'],
-                'estimated_output_units' => $dynamicEstimate['estimated_output_units'],
-                'estimated_cost_usd' => $dynamicEstimate['estimated_cost_usd'],
-                'status' => $dynamicAgentMetrics['status'],
-            ],
-            'style_editor' => [
-                'model_name' => $styleEditorMetrics['model_name'],
-                'input_chars' => $styleEditorMetrics['input_chars'],
-                'output_chars' => $styleEditorMetrics['output_chars'],
-                'estimated_input_units' => $styleEstimate['estimated_input_units'],
-                'estimated_output_units' => $styleEstimate['estimated_output_units'],
-                'estimated_cost_usd' => $styleEstimate['estimated_cost_usd'],
-                'status' => $styleEditorMetrics['status'],
-            ],
-        ];
+        $costSummary = $costBreakdownCalculator->calculate([
+            new AiAgentRunMetricsData(
+                key: 'dynamic_section',
+                modelName: $dynamicAgentMetrics['model_name'],
+                inputChars: $dynamicAgentMetrics['input_chars'],
+                outputChars: $dynamicAgentMetrics['output_chars'],
+                status: $dynamicAgentMetrics['status'],
+            ),
+            new AiAgentRunMetricsData(
+                key: 'style_editor',
+                modelName: $styleEditorMetrics['model_name'],
+                inputChars: $styleEditorMetrics['input_chars'],
+                outputChars: $styleEditorMetrics['output_chars'],
+                status: $styleEditorMetrics['status'],
+            ),
+        ]);
 
         TechnicalMemoryGenerationMetric::query()->create([
             'technical_memory_id' => $memory->id,
@@ -487,10 +471,10 @@ class GenerateTechnicalMemorySection implements ShouldQueue
             'duration_ms' => max(0, $durationMs),
             'output_chars' => $safeOutputChars,
             'model_name' => $dynamicAgentMetrics['model_name'],
-            'estimated_input_units' => $estimatedInputUnits,
-            'estimated_output_units' => $estimatedOutputUnits,
-            'estimated_cost_usd' => $estimatedCostUsd,
-            'agent_cost_breakdown' => $agentCostBreakdown,
+            'estimated_input_units' => $costSummary['estimated_input_units'],
+            'estimated_output_units' => $costSummary['estimated_output_units'],
+            'estimated_cost_usd' => $costSummary['estimated_cost_usd'],
+            'agent_cost_breakdown' => $costSummary['breakdown'],
         ]);
     }
 }
