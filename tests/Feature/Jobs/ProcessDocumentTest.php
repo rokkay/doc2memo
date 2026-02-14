@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Ai\Agents\DocumentAnalyzer;
+use App\Actions\Documents\AnalyzeDocumentWithMetricsAction;
 use App\Jobs\ProcessDocument;
 use App\Models\Document;
 use App\Models\Tender;
@@ -223,4 +224,97 @@ it('stores textual deadline without relying on model date casts', function (): v
     $storedDeadline = DB::table('tenders')->where('id', $tender->id)->value('deadline_date');
 
     expect($storedDeadline)->toBe('“decimoquinto dia desde la publicacion”');
+});
+
+it('delegates document analysis and keeps persisted analysis cost breakdown keys', function (): void {
+    Storage::fake('local');
+
+    $tender = Tender::factory()->pending()->create();
+    $filePath = 'documents/'.$tender->id.'/pca.md';
+    Storage::disk('local')->put($filePath, '# PCA');
+
+    $document = Document::factory()->create([
+        'tender_id' => $tender->id,
+        'document_type' => 'pca',
+        'file_path' => $filePath,
+        'mime_type' => 'text/markdown',
+        'status' => 'uploaded',
+    ]);
+
+    DocumentAnalyzer::fake([
+        [
+            'tender_info' => [
+                'title' => 'Servicio Portal Web',
+                'issuing_company' => 'Entidad convocante',
+                'reference_number' => 'EXP-2026-01',
+                'deadline_date' => '15 dias',
+                'description' => 'Contrato de servicios',
+            ],
+            'criteria' => [],
+            'insights' => [],
+        ],
+    ])->preventStrayPrompts();
+
+    $delegate = new class
+    {
+        public bool $called = false;
+
+        /**
+         * @return array{analysis:array<string,mixed>,costSummary:array{estimated_input_units:float,estimated_output_units:float,estimated_cost_usd:float,breakdown:array<string,array<string,int|float|string>>},dedicatedCriteria:array<int,mixed>}
+         */
+        public function __invoke(Document $document, string $text): array
+        {
+            $this->called = true;
+
+            return [
+                'analysis' => [
+                    'tender_info' => [
+                        'title' => 'Servicio Portal Web',
+                        'issuing_company' => 'Entidad convocante',
+                        'reference_number' => 'EXP-2026-01',
+                        'deadline_date' => '15 dias',
+                        'description' => 'Contrato de servicios',
+                    ],
+                    'criteria' => [],
+                    'insights' => [],
+                ],
+                'costSummary' => [
+                    'estimated_input_units' => 0.002,
+                    'estimated_output_units' => 0.001,
+                    'estimated_cost_usd' => 0.003,
+                    'breakdown' => [
+                        'document_analyzer' => [
+                            'model_name' => 'gpt-5.2',
+                            'input_chars' => 100,
+                            'output_chars' => 100,
+                            'estimated_input_units' => 0.001,
+                            'estimated_output_units' => 0.0005,
+                            'estimated_cost_usd' => 0.0015,
+                            'status' => 'completed',
+                        ],
+                        'dedicated_judgment_extractor' => [
+                            'model_name' => 'gpt-5-mini',
+                            'input_chars' => 0,
+                            'output_chars' => 0,
+                            'estimated_input_units' => 0.001,
+                            'estimated_output_units' => 0.0005,
+                            'estimated_cost_usd' => 0.0015,
+                            'status' => 'skipped',
+                        ],
+                    ],
+                ],
+                'dedicatedCriteria' => [],
+            ];
+        }
+    };
+
+    app()->instance(AnalyzeDocumentWithMetricsAction::class, $delegate);
+
+    (new ProcessDocument($document))->handle();
+
+    $processedDocument = $document->fresh();
+
+    expect($delegate->called)->toBeTrue()
+        ->and($processedDocument?->analysis_cost_breakdown)->toBeArray()
+        ->and($processedDocument?->analysis_cost_breakdown)->toHaveKeys(['document_analyzer', 'dedicated_judgment_extractor']);
 });

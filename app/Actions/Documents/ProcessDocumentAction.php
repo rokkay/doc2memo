@@ -4,17 +4,13 @@ declare(strict_types=1);
 
 namespace App\Actions\Documents;
 
-use App\Ai\Agents\DocumentAnalyzer;
-use App\Ai\Agents\PcaJudgmentCriteriaExtractorAgent;
 use App\Data\JudgmentCriterionData;
 use App\Models\Document;
 use App\Models\DocumentInsight;
 use App\Models\ExtractedCriterion;
 use App\Models\ExtractedSpecification;
 use App\Support\JudgmentCriteriaParser;
-use App\Support\TechnicalMemoryCostEstimator;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Smalot\PdfParser\Parser;
@@ -41,30 +37,16 @@ final class ProcessDocumentAction
             'extracted_text' => mb_substr($text, 0, 10000),
         ]);
 
-        $costEstimator = resolve(TechnicalMemoryCostEstimator::class);
-        $documentAnalyzer = new DocumentAnalyzer($document->document_type);
-        $analysisAgentMetrics = [
-            'model_name' => $documentAnalyzer->modelName(),
-            'input_chars' => max(0, $documentAnalyzer->estimateInputChars($text)),
-            'output_chars' => 0,
-            'status' => 'pending',
-        ];
-        $dedicatedExtractorMetrics = [
-            'model_name' => PcaJudgmentCriteriaExtractorAgent::MODEL_NAME,
-            'input_chars' => 0,
-            'output_chars' => 0,
-            'status' => $document->document_type === 'pca' ? 'pending' : 'skipped',
-        ];
+        $analysisPayload = resolve(AnalyzeDocumentWithMetricsAction::class)($document, $text);
+        $analysis = $analysisPayload['analysis'];
+        $costSummary = $analysisPayload['costSummary'];
+        $dedicatedCriteria = $analysisPayload['dedicatedCriteria'];
 
-        $analysis = $this->analyzeText($documentAnalyzer, $text);
-        $analysisAgentMetrics['output_chars'] = $this->estimateSerializedChars($analysis);
-        $analysisAgentMetrics['status'] = 'completed';
-
-        DB::transaction(function () use ($document, $analysis, $text, $analysisAgentMetrics, &$dedicatedExtractorMetrics, $costEstimator): void {
+        DB::transaction(function () use ($document, $analysis, $costSummary, $dedicatedCriteria): void {
             $this->clearPreviousExtractions($document);
 
             if ($document->document_type === 'pca') {
-                $this->storePcaData($document, $analysis, $text, $dedicatedExtractorMetrics);
+                $this->storePcaData($document, $analysis, $dedicatedCriteria);
             }
 
             if ($document->document_type === 'ppt') {
@@ -72,19 +54,14 @@ final class ProcessDocumentAction
             }
 
             $insightsCount = $this->storeInsights($document, $analysis['insights'] ?? []);
-            $analysisCost = $this->estimateAnalysisCost(
-                analysisAgentMetrics: $analysisAgentMetrics,
-                dedicatedExtractorMetrics: $dedicatedExtractorMetrics,
-                estimator: $costEstimator,
-            );
 
             $document->update([
                 'status' => 'analyzed',
                 'insights_count' => $insightsCount,
-                'estimated_analysis_input_units' => $analysisCost['estimated_input_units'],
-                'estimated_analysis_output_units' => $analysisCost['estimated_output_units'],
-                'estimated_analysis_cost_usd' => $analysisCost['estimated_cost_usd'],
-                'analysis_cost_breakdown' => $analysisCost['breakdown'],
+                'estimated_analysis_input_units' => $costSummary['estimated_input_units'],
+                'estimated_analysis_output_units' => $costSummary['estimated_output_units'],
+                'estimated_analysis_cost_usd' => $costSummary['estimated_cost_usd'],
+                'analysis_cost_breakdown' => $costSummary['breakdown'],
                 'processing_error' => null,
                 'analyzed_at' => now(),
             ]);
@@ -108,11 +85,6 @@ final class ProcessDocumentAction
         return $pdf->getText();
     }
 
-    private function analyzeText(DocumentAnalyzer $documentAnalyzer, string $text): array
-    {
-        return $documentAnalyzer->analyze($text);
-    }
-
     private function clearPreviousExtractions(Document $document): void
     {
         $document->extractedCriteria()->delete();
@@ -121,9 +93,9 @@ final class ProcessDocumentAction
     }
 
     /**
-     * @param  array{model_name:string,input_chars:int,output_chars:int,status:string}  $dedicatedExtractorMetrics
+     * @param  array<int,JudgmentCriterionData>  $dedicatedJudgmentCriteria
      */
-    private function storePcaData(Document $document, array $analysis, string $sourceText, array &$dedicatedExtractorMetrics): void
+    private function storePcaData(Document $document, array $analysis, array $dedicatedJudgmentCriteria): void
     {
         $tenderInfo = $analysis['tender_info'] ?? [];
 
@@ -147,7 +119,6 @@ final class ProcessDocumentAction
         }
 
         $criteria = is_array($analysis['criteria'] ?? null) ? $analysis['criteria'] : [];
-        $dedicatedJudgmentCriteria = $this->extractDedicatedJudgmentCriteria($sourceText, $criteria, $dedicatedExtractorMetrics);
 
         foreach ($criteria as $criterion) {
             $criterionType = $this->normalizeCriterionType(
@@ -237,78 +208,6 @@ final class ProcessDocumentAction
         }
     }
 
-    /**
-     * @param  array<int,mixed>  $criteria
-     * @param  array{model_name:string,input_chars:int,output_chars:int,status:string}  $dedicatedExtractorMetrics
-     * @return array<int,JudgmentCriterionData>
-     */
-    private function extractDedicatedJudgmentCriteria(string $sourceText, array $criteria, array &$dedicatedExtractorMetrics): array
-    {
-        if (! $this->shouldRunDedicatedJudgmentExtractor($criteria)) {
-            $dedicatedExtractorMetrics['status'] = 'skipped';
-
-            return [];
-        }
-
-        $extractor = new PcaJudgmentCriteriaExtractorAgent;
-        $dedicatedExtractorMetrics['model_name'] = $extractor->modelName();
-        $dedicatedExtractorMetrics['input_chars'] = max(0, $extractor->estimateInputChars($sourceText));
-
-        try {
-            $items = $extractor->extract($sourceText);
-            $dedicatedExtractorMetrics['output_chars'] = $this->estimateSerializedChars(['criteria' => $items]);
-            $dedicatedExtractorMetrics['status'] = 'completed';
-
-            return collect($items)
-                ->filter(fn (mixed $item): bool => is_array($item))
-                ->map(fn (array $item): JudgmentCriterionData => JudgmentCriterionData::fromArray([
-                    'section_number' => $item['section_number'] ?? null,
-                    'section_title' => $item['section_title'] ?? 'Sin sección',
-                    'description' => $item['description'] ?? '',
-                    'priority' => $item['priority'] ?? 'mandatory',
-                    'criterion_type' => 'judgment',
-                    'score_points' => $item['score_points'] ?? null,
-                    'source' => 'dedicated_extractor',
-                    'confidence' => 0.95,
-                    'source_reference' => $this->resolveSourceReference(
-                        sectionNumber: is_string($item['section_number'] ?? null) ? $item['section_number'] : null,
-                        sectionTitle: (string) ($item['section_title'] ?? ''),
-                        metadata: is_array($item['metadata'] ?? null) ? $item['metadata'] : [],
-                    ),
-                    'group_key' => '',
-                    'metadata' => is_array($item['metadata'] ?? null) ? $item['metadata'] : null,
-                ]))
-                ->filter(fn (JudgmentCriterionData $item): bool => $item->sectionTitle !== '' && $item->description !== '')
-                ->values()
-                ->all();
-        } catch (\Throwable $exception) {
-            $dedicatedExtractorMetrics['status'] = 'failed';
-
-            Log::warning('Dedicated judgment criteria extraction failed, using fallback criteria.', [
-                'error' => $exception->getMessage(),
-            ]);
-
-            return [];
-        }
-    }
-
-    /**
-     * @param  array<int,mixed>  $criteria
-     */
-    private function shouldRunDedicatedJudgmentExtractor(array $criteria): bool
-    {
-        return collect($criteria)
-            ->filter(fn (mixed $criterion): bool => is_array($criterion))
-            ->contains(function (array $criterion): bool {
-                $content = Str::of(
-                    (string) ($criterion['section_number'] ?? '')
-                    .' '.(string) ($criterion['section_title'] ?? '')
-                    .' '.(string) ($criterion['description'] ?? '')
-                )->lower()->toString();
-
-                return preg_match('/juicio\s+de\s+valor|sobre\s*b|criterios?\s+b/u', $content) === 1;
-            });
-    }
 
     /**
      * @return array<int,JudgmentCriterionData>
@@ -504,68 +403,6 @@ final class ProcessDocumentAction
     private function buildGroupKey(?string $sectionNumber, string $sectionTitle): string
     {
         return $this->judgmentCriteriaParser->buildGroupKey($sectionNumber, $sectionTitle);
-    }
-
-    /**
-     * @param  array{model_name:string,input_chars:int,output_chars:int,status:string}  $analysisAgentMetrics
-     * @param  array{model_name:string,input_chars:int,output_chars:int,status:string}  $dedicatedExtractorMetrics
-     * @return array{estimated_input_units:float,estimated_output_units:float,estimated_cost_usd:float,breakdown:array<string,array<string,int|float|string>>}
-     */
-    private function estimateAnalysisCost(
-        array $analysisAgentMetrics,
-        array $dedicatedExtractorMetrics,
-        TechnicalMemoryCostEstimator $estimator,
-    ): array {
-        $analysisEstimate = $estimator->estimate(
-            model: $analysisAgentMetrics['model_name'],
-            inputChars: $analysisAgentMetrics['input_chars'],
-            outputChars: $analysisAgentMetrics['output_chars'],
-        );
-        $dedicatedEstimate = $estimator->estimate(
-            model: $dedicatedExtractorMetrics['model_name'],
-            inputChars: $dedicatedExtractorMetrics['input_chars'],
-            outputChars: $dedicatedExtractorMetrics['output_chars'],
-        );
-
-        return [
-            'estimated_input_units' => round($analysisEstimate['estimated_input_units'] + $dedicatedEstimate['estimated_input_units'], 4),
-            'estimated_output_units' => round($analysisEstimate['estimated_output_units'] + $dedicatedEstimate['estimated_output_units'], 4),
-            'estimated_cost_usd' => round($analysisEstimate['estimated_cost_usd'] + $dedicatedEstimate['estimated_cost_usd'], 6),
-            'breakdown' => [
-                'document_analyzer' => [
-                    'model_name' => $analysisAgentMetrics['model_name'],
-                    'input_chars' => $analysisAgentMetrics['input_chars'],
-                    'output_chars' => $analysisAgentMetrics['output_chars'],
-                    'estimated_input_units' => $analysisEstimate['estimated_input_units'],
-                    'estimated_output_units' => $analysisEstimate['estimated_output_units'],
-                    'estimated_cost_usd' => $analysisEstimate['estimated_cost_usd'],
-                    'status' => $analysisAgentMetrics['status'],
-                ],
-                'dedicated_judgment_extractor' => [
-                    'model_name' => $dedicatedExtractorMetrics['model_name'],
-                    'input_chars' => $dedicatedExtractorMetrics['input_chars'],
-                    'output_chars' => $dedicatedExtractorMetrics['output_chars'],
-                    'estimated_input_units' => $dedicatedEstimate['estimated_input_units'],
-                    'estimated_output_units' => $dedicatedEstimate['estimated_output_units'],
-                    'estimated_cost_usd' => $dedicatedEstimate['estimated_cost_usd'],
-                    'status' => $dedicatedExtractorMetrics['status'],
-                ],
-            ],
-        ];
-    }
-
-    /**
-     * @param  array<mixed>  $payload
-     */
-    private function estimateSerializedChars(array $payload): int
-    {
-        $encoded = json_encode($payload, JSON_UNESCAPED_UNICODE);
-
-        if (! is_string($encoded)) {
-            return 0;
-        }
-
-        return max(0, mb_strlen($encoded));
     }
 
     private function parseNumericValue(mixed $value): ?float

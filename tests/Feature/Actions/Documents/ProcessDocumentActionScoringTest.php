@@ -56,6 +56,12 @@ it('stores criterion type, score points, and group key from analyzer payload', f
 
     (new ProcessDocumentAction)($document);
 
+    $processedDocument = $document->fresh();
+
+    expect($processedDocument?->analysis_cost_breakdown)
+        ->toBeArray()
+        ->toHaveKeys(['document_analyzer', 'dedicated_judgment_extractor']);
+
     assertDatabaseHas('extracted_criteria', [
         'document_id' => $document->id,
         'section_title' => 'Metodología',
