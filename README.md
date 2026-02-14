@@ -1,19 +1,63 @@
 # Doc2Memo
 
-Doc2Memo helps teams prepare a competitive technical report ("Memoria tecnica") for public tenders.
+Doc2Memo helps teams build stronger technical memories for public tenders in Spain.
+Starting from the tender documents (`PCA` and `PPT`), it analyzes requirements with AI and produces a structured, editable, and exportable technical proposal.
 
-The app workflow is:
+> From raw tender docs to a submission-ready technical memory in minutes, not days.
 
-1. Create a tender and upload two source documents:
-   - `PCA` (administrative conditions)
-   - `PPT` (technical specifications)
-2. Documents are processed by queue jobs and analyzed with Laravel AI agents.
-3. Extracted criteria, specifications, and insights are stored in the database.
-4. The user triggers memory generation, which runs async and produces the final technical memory.
+Sample documents: `docs/samples/*`.
 
-Sample tender documents are available at `docs/samples/*`.
+## For teams
 
-## Tech Stack
+Doc2Memo is designed to reduce time spent on repetitive drafting while keeping proposal quality high.
+
+- Upload your `PCA` and `PPT` files (`pdf`, `md`, `txt`).
+- Let asynchronous AI analysis extract criteria, specifications, and strategic insights.
+- Generate a technical memory in dynamic sections aligned with judgment-based evaluation criteria.
+- Regenerate individual sections when you want a better draft.
+- Export the final output as `PDF` or `Markdown`.
+
+### Quick 5-minute flow
+
+1. Create a tender and upload `PCA` + `PPT`.
+2. Wait for background analysis to complete.
+3. Generate the technical memory.
+4. Review sections, regenerate weak parts, and export.
+
+### Why it is useful
+
+- Prioritizes scoring opportunities from judgment criteria.
+- Speeds up first drafts without losing structure.
+- Keeps the process traceable with operational metrics.
+
+## Key capabilities
+
+- Tender creation and document ingestion for `PCA`/`PPT`.
+- Queue-based analysis pipeline with AI agents.
+- Criteria classification (`judgment` and `automatic`) with score normalization.
+- Dynamic section generation (one queue job per section).
+- Per-section quality gate, retries, and optional style editor pass.
+- Internal operational metrics dashboard at `technical-memories/operational-metrics`.
+
+### Output quality controls
+
+- Dynamic sections are built from judgment-based criteria groups.
+- Each section runs through a quality gate before completion.
+- Failed quality checks can be retried automatically.
+- Optional style editing improves readability while preserving facts.
+
+## Architecture at a glance
+
+1. A tender is created and `PCA` + `PPT` are uploaded.
+2. `ProcessDocument` analyzes each document asynchronously.
+3. Criteria, specifications, and insights are persisted.
+4. `GenerateTechnicalMemory` groups judgment criteria into dynamic sections.
+5. `GenerateTechnicalMemorySection` generates each section and updates status/metrics.
+6. Users review the memory, regenerate sections if needed, and export to PDF/Markdown.
+
+## For developers
+
+### Tech stack
 
 - PHP 8.4
 - Laravel 12
@@ -21,77 +65,98 @@ Sample tender documents are available at `docs/samples/*`.
 - Pest 4
 - Laravel AI SDK (`laravel/ai`)
 - Tailwind CSS 4
+- SQLite by default
 
-## Local Setup
+### Local setup
 
-1. Install dependencies:
+#### Quick option
+
+1. Copy environment variables and create local SQLite file:
+
+```bash
+cp .env.example .env
+php -r "file_exists('database/database.sqlite') || touch('database/database.sqlite');"
+```
+
+2. Install and bootstrap the project:
+
+```bash
+composer setup
+```
+
+3. Configure at least one AI provider key in `.env` (OpenAI is the default):
+
+```dotenv
+OPENAI_API_KEY=your_key
+```
+
+4. Run the full development environment (server, 3 queue workers, and Vite):
+
+```bash
+composer dev
+```
+
+Then open the app and start from the tenders list.
+
+#### Manual option
 
 ```bash
 composer install
 npm install
-```
-
-2. Configure environment:
-
-```bash
-cp .env.example .env
 php artisan key:generate
-```
-
-3. Run database migrations:
-
-```bash
 php artisan migrate
-```
-
-4. Start app services:
-
-```bash
 php artisan serve
-php artisan queue:work
+php artisan queue:work --timeout=300 --tries=1
 npm run dev
 ```
 
-Queue workers are required for both document analysis and memory generation.
+### Domain map
 
-## Important Runtime Notes
+- `app/Livewire/Tenders/CreateTender.php`: tender creation and document upload.
+- `app/Actions/Documents/ProcessDocumentAction.php`: extraction and persistence for PCA/PPT data.
+- `app/Ai/Agents/DocumentAnalyzer.php`: structured document analysis.
+- `app/Ai/Agents/PcaJudgmentCriteriaExtractorAgent.php`: dedicated extraction of judgment criteria.
+- `app/Actions/Tenders/GenerateTechnicalMemoryAction.php`: dynamic section orchestration.
+- `app/Jobs/GenerateTechnicalMemorySection.php`: per-section generation, quality gate, and metrics.
+- `app/Ai/Agents/TechnicalMemoryDynamicSectionAgent.php`: section drafting.
+- `app/Ai/Agents/TechnicalMemorySectionEditorAgent.php`: post-generation style editing.
+- `app/Livewire/TechnicalMemories/ShowMemory.php`: memory page and section regeneration.
+- `app/Livewire/TechnicalMemories/OperationalMetrics.php`: internal metrics dashboard.
 
-- The `deadline_date` field is stored as plain text (not a date type), because tenders often describe deadlines in natural language.
-- Document and memory actions are asynchronous; UI feedback appears immediately while jobs continue in background.
-- If code changes are not reflected in processing behavior, restart workers:
+### Useful routes
+
+- `/`: redirects to tenders list.
+- `/tenders/create`: create a new tender.
+- `/technical-memories/operational-metrics`: internal monitoring dashboard.
+
+### Testing and quality
+
+```bash
+php artisan test --compact
+vendor/bin/pint --dirty --format agent
+```
+
+To run one specific test:
+
+```bash
+php artisan test --compact tests/Feature/Jobs/GenerateTechnicalMemorySectionTest.php
+```
+
+### Operations and maintenance
+
+- `deadline_date` is stored as text to support natural language deadlines.
+- The system depends on active queue workers for analysis and generation.
+- Old metrics are purged daily with `technical-memory:purge-metrics`.
+- If code changes are not reflected in running jobs:
 
 ```bash
 php artisan queue:restart
 php artisan optimize:clear
 ```
 
-## Main Domain Flow
-
-- `app/Livewire/Tenders/CreateTender.php`: tender creation + document upload
-- `app/Jobs/ProcessDocument.php`: per-document analysis job
-- `app/Actions/Documents/ProcessDocumentAction.php`: extraction + persistence
-- `app/Jobs/GenerateTechnicalMemory.php`: async memory generation job
-- `app/Actions/Tenders/GenerateTechnicalMemoryAction.php`: memory building + save
-- `app/Ai/Agents/DocumentAnalyzer.php`: PCA/PPT structured extraction
-- `app/Ai/Agents/TechnicalMemoryGenerator.php`: final technical memory generation
-
-## Testing
-
-Run all tests:
-
-```bash
-php artisan test --compact
-```
-
-Format changed files:
-
-```bash
-php vendor/bin/pint --dirty --format agent
-```
-
 ## Troubleshooting
 
-- **Jobs not moving / UI stuck in processing**: verify `queue:work` is running.
-- **Old behavior after code changes**: run `php artisan queue:restart`.
-- **AI calls timing out in browser action**: make sure action is queued (current design is async).
-- **Vite assets not updating**: run `npm run dev`.
+- Stuck jobs: verify active workers (`composer dev` or `php artisan queue:work ...`).
+- Memory generation not progressing: check section states in the memory view and application logs.
+- Frontend changes not visible: run `npm run dev` or rebuild with `npm run build`.
+- Vite asset runtime errors: restart `npm run dev`.
