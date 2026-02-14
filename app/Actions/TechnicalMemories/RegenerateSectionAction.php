@@ -12,6 +12,7 @@ use App\Jobs\GenerateTechnicalMemorySection;
 use App\Models\TechnicalMemory;
 use App\Models\TechnicalMemorySection;
 use App\Models\Tender;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 final class RegenerateSectionAction
@@ -27,8 +28,9 @@ final class RegenerateSectionAction
             'pptDocument',
         ]);
 
-        $sectionCriteria = $tender->extractedCriteria
-            ->where('criterion_type', 'judgment')
+        $preferredJudgmentCriteria = $this->preferredJudgmentCriteria($tender);
+
+        $sectionCriteria = $preferredJudgmentCriteria
             ->where('group_key', $section->group_key)
             ->values();
 
@@ -48,7 +50,7 @@ final class RegenerateSectionAction
 
         $context = new TechnicalMemoryGenerationContextData(
             pca: [
-                'criteria' => $this->buildPcaCriteriaPayload($tender),
+                'criteria' => $this->buildPcaCriteriaPayload($preferredJudgmentCriteria),
                 'insights' => $this->buildInsightsPayload($tender, optional($tender->pcaDocument)->id),
             ],
             ppt: [
@@ -88,13 +90,31 @@ final class RegenerateSectionAction
     /**
      * @return array<int,array{section_number:?string,section_title:string,description:string,priority:string,criterion_type:string,score_points:?float,group_key:string,source:string,confidence:?float,source_reference:?string,metadata:?array<string,mixed>}>
      */
-    private function buildPcaCriteriaPayload(Tender $tender): array
+    private function buildPcaCriteriaPayload(Collection $criteria): array
     {
-        return $tender->extractedCriteria
-            ->where('criterion_type', 'judgment')
-            ->values()
+        return $criteria
             ->map(fn ($criterion): array => JudgmentCriterionData::fromModel($criterion)->toArray())
             ->all();
+    }
+
+    /**
+     * @return Collection<int,\App\Models\ExtractedCriterion>
+     */
+    private function preferredJudgmentCriteria(Tender $tender): Collection
+    {
+        $judgmentCriteria = $tender->extractedCriteria
+            ->where('criterion_type', 'judgment')
+            ->values();
+
+        $dedicatedCriteria = $judgmentCriteria
+            ->where('source', 'dedicated_extractor')
+            ->values();
+
+        if ($dedicatedCriteria->isNotEmpty()) {
+            return $dedicatedCriteria;
+        }
+
+        return $judgmentCriteria;
     }
 
     /**

@@ -28,9 +28,7 @@ final class GenerateTechnicalMemoryAction
 
     public function __invoke(Tender $tender): void
     {
-        $rawJudgmentCriteria = $tender->judgmentCriteria()
-            ->orderBy('id')
-            ->get();
+        $rawJudgmentCriteria = $this->preferredJudgmentCriteria($tender);
 
         $criteria = $this->expandCriteriaForGrouping($rawJudgmentCriteria);
 
@@ -154,6 +152,25 @@ final class GenerateTechnicalMemoryAction
                 runId: (string) $generationContext->runId,
             );
         }
+    }
+
+    /**
+     * @return Collection<int,ExtractedCriterion>
+     */
+    private function preferredJudgmentCriteria(Tender $tender): Collection
+    {
+        $dedicatedCriteria = $tender->judgmentCriteria()
+            ->where('source', 'dedicated_extractor')
+            ->orderBy('id')
+            ->get();
+
+        if ($dedicatedCriteria->isNotEmpty()) {
+            return $dedicatedCriteria;
+        }
+
+        return $tender->judgmentCriteria()
+            ->orderBy('id')
+            ->get();
     }
 
     /**

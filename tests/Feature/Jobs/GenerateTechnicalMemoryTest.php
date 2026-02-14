@@ -14,6 +14,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 
 use function Pest\Laravel\assertDatabaseHas;
+use function Pest\Laravel\assertDatabaseMissing;
 
 uses(RefreshDatabase::class);
 
@@ -44,6 +45,7 @@ it('creates dynamic draft memory and dispatches one job per judgment section', f
         'priority' => 'mandatory',
         'criterion_type' => 'judgment',
         'score_points' => 25,
+        'source' => 'dedicated_extractor',
     ]);
 
     ExtractedCriterion::factory()->create([
@@ -56,6 +58,7 @@ it('creates dynamic draft memory and dispatches one job per judgment section', f
         'priority' => 'preferable',
         'criterion_type' => 'judgment',
         'score_points' => 15,
+        'source' => 'dedicated_extractor',
     ]);
 
     ExtractedCriterion::factory()->create([
@@ -68,6 +71,7 @@ it('creates dynamic draft memory and dispatches one job per judgment section', f
         'priority' => 'mandatory',
         'criterion_type' => 'judgment',
         'score_points' => 20,
+        'source' => 'dedicated_extractor',
     ]);
 
     ExtractedCriterion::factory()->create([
@@ -80,6 +84,7 @@ it('creates dynamic draft memory and dispatches one job per judgment section', f
         'priority' => 'mandatory',
         'criterion_type' => 'automatic',
         'score_points' => 40,
+        'source' => 'analyzer',
     ]);
 
     ExtractedSpecification::factory()->create([
@@ -150,6 +155,7 @@ it('splits a grouped judgment criterion into multiple dynamic sections', functio
         'priority' => 'mandatory',
         'criterion_type' => 'judgment',
         'score_points' => 50,
+        'source' => 'analyzer',
     ]);
 
     (new GenerateTechnicalMemory($tender))->handle();
@@ -171,6 +177,93 @@ it('splits a grouped judgment criterion into multiple dynamic sections', functio
     Queue::assertPushedTimes(GenerateTechnicalMemorySection::class, 6);
 });
 
+it('uses only dedicated extractor criteria when available', function (): void {
+    Queue::fake();
+
+    $tender = Tender::factory()->completed()->create();
+
+    $pcaDocument = Document::factory()->create([
+        'tender_id' => $tender->id,
+        'document_type' => 'pca',
+    ]);
+
+    ExtractedCriterion::factory()->create([
+        'tender_id' => $tender->id,
+        'document_id' => $pcaDocument->id,
+        'section_number' => 'B.1.1',
+        'section_title' => 'Propuesta de evolución funcional',
+        'group_key' => 'B.1.1-propuesta-de-evolucion-funcional',
+        'criterion_type' => 'judgment',
+        'score_points' => 16,
+        'source' => 'analyzer',
+    ]);
+
+    ExtractedCriterion::factory()->create([
+        'tender_id' => $tender->id,
+        'document_id' => $pcaDocument->id,
+        'section_number' => 'Cuadro criterios adjudicación A/B',
+        'section_title' => 'Oferta técnica (juicio de valor)',
+        'group_key' => 'Cuadro criterios adjudicación A/B-oferta-tecnica-juicio-de-valor',
+        'criterion_type' => 'judgment',
+        'score_points' => 50,
+        'source' => 'analyzer',
+    ]);
+
+    ExtractedCriterion::factory()->create([
+        'tender_id' => $tender->id,
+        'document_id' => $pcaDocument->id,
+        'section_number' => '1.1',
+        'section_title' => 'Propuesta de Evolución Funcional',
+        'group_key' => '1.1-propuesta-de-evolucion-funcional',
+        'criterion_type' => 'judgment',
+        'score_points' => 16,
+        'source' => 'dedicated_extractor',
+    ]);
+
+    ExtractedCriterion::factory()->create([
+        'tender_id' => $tender->id,
+        'document_id' => $pcaDocument->id,
+        'section_number' => '1.2',
+        'section_title' => 'Propuesta de Evolución Tecnológica',
+        'group_key' => '1.2-propuesta-de-evolucion-tecnologica',
+        'criterion_type' => 'judgment',
+        'score_points' => 10,
+        'source' => 'dedicated_extractor',
+    ]);
+
+    (new GenerateTechnicalMemory($tender))->handle();
+
+    $memory = $tender->fresh()->technicalMemory;
+
+    expect($memory)->not->toBeNull();
+    expect($memory?->sections()->count())->toBe(2);
+    expect((float) $memory?->sections()->sum('total_points'))->toBe(26.0);
+
+    assertDatabaseHas('technical_memory_sections', [
+        'technical_memory_id' => $memory?->id,
+        'section_number' => '1.1',
+        'section_title' => 'Propuesta de Evolución Funcional',
+    ]);
+
+    assertDatabaseHas('technical_memory_sections', [
+        'technical_memory_id' => $memory?->id,
+        'section_number' => '1.2',
+        'section_title' => 'Propuesta de Evolución Tecnológica',
+    ]);
+
+    assertDatabaseMissing('technical_memory_sections', [
+        'technical_memory_id' => $memory?->id,
+        'section_number' => 'B.1.1',
+    ]);
+
+    assertDatabaseMissing('technical_memory_sections', [
+        'technical_memory_id' => $memory?->id,
+        'section_number' => 'Cuadro criterios adjudicación A/B',
+    ]);
+
+    Queue::assertPushedTimes(GenerateTechnicalMemorySection::class, 2);
+});
+
 it('propagates one run id to every section generation job in a full generation', function (): void {
     Queue::fake();
 
@@ -189,6 +282,7 @@ it('propagates one run id to every section generation job in a full generation',
         'group_key' => '1.1-metodologia',
         'criterion_type' => 'judgment',
         'score_points' => 16,
+        'source' => 'dedicated_extractor',
     ]);
 
     ExtractedCriterion::factory()->create([
@@ -199,6 +293,7 @@ it('propagates one run id to every section generation job in a full generation',
         'group_key' => '2.1-gobierno',
         'criterion_type' => 'judgment',
         'score_points' => 12,
+        'source' => 'dedicated_extractor',
     ]);
 
     (new GenerateTechnicalMemory($tender))->handle();
