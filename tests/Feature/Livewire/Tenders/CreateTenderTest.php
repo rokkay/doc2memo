@@ -61,7 +61,7 @@ it('creates tender with documents', function (): void {
     Storage::fake('local');
     Queue::fake();
 
-    Livewire::test(CreateTender::class)
+    $component = Livewire::test(CreateTender::class)
         ->set('form.title', 'Test Tender Title')
         ->set('form.issuing_company', 'Test Company')
         ->set('form.reference_number', 'REF-123')
@@ -69,11 +69,12 @@ it('creates tender with documents', function (): void {
         ->set('pcaFile', UploadedFile::fake()->create('pca.pdf', 100, 'application/pdf'))
         ->set('pptFile', UploadedFile::fake()->create('ppt.pdf', 100, 'application/pdf'))
         ->call('save')
-        ->assertHasNoErrors()
-        ->assertRedirect(route('tenders.index'));
+        ->assertHasNoErrors();
 
     $tender = Tender::where('title', 'Test Tender Title')->first();
     expect($tender)->not->toBeNull();
+    $component->assertRedirect(route('tenders.show', $tender));
+
     expect($tender->issuing_company)->toBe('Test Company');
     expect($tender->reference_number)->toBe('REF-123');
     expect($tender->status)->toBe('analyzing');

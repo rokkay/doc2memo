@@ -95,7 +95,7 @@ class CreateTender extends Component
         }
 
         try {
-            DB::transaction(function (): void {
+            $createdTender = DB::transaction(function (): Tender {
                 $tender = Tender::create([
                     'title' => $this->form->title,
                     'issuing_company' => $this->form->issuing_company,
@@ -109,10 +109,12 @@ class CreateTender extends Component
                 $this->storeDocument($tender, $this->pptFile, 'ppt');
 
                 ($this->analyzeTenderDocumentsAction)($tender);
+
+                return $tender;
             });
 
             session()->flash('success', 'Licitación creada correctamente.');
-            $this->redirect(route('tenders.index'));
+            $this->redirect(route('tenders.show', $createdTender));
         } catch (\Exception $e) {
             $this->dispatch('notify', [
                 'type' => 'error',
