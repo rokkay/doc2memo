@@ -12,6 +12,7 @@ use App\Support\TechnicalMemorySectionQualityGate;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Throwable;
 
 class GenerateTechnicalMemorySection implements ShouldQueue
@@ -37,6 +38,10 @@ class GenerateTechnicalMemorySection implements ShouldQueue
             return;
         }
 
+        $context = $this->context->runId !== null && $this->context->runId !== ''
+            ? $this->context
+            : $this->context->withRunId((string) Str::uuid());
+
         $memory = $section->technicalMemory;
 
         $section->update([
@@ -49,7 +54,7 @@ class GenerateTechnicalMemorySection implements ShouldQueue
 
             $content = (new TechnicalMemoryDynamicSectionAgent(
                 section: $this->section->toArray(),
-                context: $this->context->toArray(),
+                context: $context->toArray(),
             ))->generate();
 
             if ((bool) config('technical_memory.style_editor.enabled', true)) {
@@ -96,7 +101,7 @@ class GenerateTechnicalMemorySection implements ShouldQueue
                     self::dispatch(
                         technicalMemorySectionId: $this->technicalMemorySectionId,
                         section: $this->section,
-                        context: $this->context->withQualityFeedback($qualityFeedback),
+                        context: $context->withQualityFeedback($qualityFeedback),
                         qualityAttempt: $this->qualityAttempt + 1,
                     );
 

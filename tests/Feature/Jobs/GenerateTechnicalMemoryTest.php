@@ -170,3 +170,48 @@ it('splits a grouped judgment criterion into multiple dynamic sections', functio
 
     Queue::assertPushedTimes(GenerateTechnicalMemorySection::class, 6);
 });
+
+it('propagates one run id to every section generation job in a full generation', function (): void {
+    Queue::fake();
+
+    $tender = Tender::factory()->completed()->create();
+
+    $pcaDocument = Document::factory()->create([
+        'tender_id' => $tender->id,
+        'document_type' => 'pca',
+    ]);
+
+    ExtractedCriterion::factory()->create([
+        'tender_id' => $tender->id,
+        'document_id' => $pcaDocument->id,
+        'section_number' => '1.1',
+        'section_title' => 'Metodología',
+        'group_key' => '1.1-metodologia',
+        'criterion_type' => 'judgment',
+        'score_points' => 16,
+    ]);
+
+    ExtractedCriterion::factory()->create([
+        'tender_id' => $tender->id,
+        'document_id' => $pcaDocument->id,
+        'section_number' => '2.1',
+        'section_title' => 'Gobierno',
+        'group_key' => '2.1-gobierno',
+        'criterion_type' => 'judgment',
+        'score_points' => 12,
+    ]);
+
+    (new GenerateTechnicalMemory($tender))->handle();
+
+    $jobs = Queue::pushed(GenerateTechnicalMemorySection::class);
+
+    $runIds = $jobs
+        ->map(fn (GenerateTechnicalMemorySection $queuedJob): ?string => $queuedJob->context->runId)
+        ->filter(fn (?string $runId): bool => is_string($runId) && $runId !== '')
+        ->unique()
+        ->values();
+
+    expect($jobs)->toHaveCount(2)
+        ->and($runIds)->toHaveCount(1)
+        ->and($runIds->first())->not->toBe('');
+});

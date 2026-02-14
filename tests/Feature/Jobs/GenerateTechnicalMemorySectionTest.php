@@ -196,6 +196,8 @@ it('retries once when generated section does not meet quality gate', function ()
     Queue::assertPushed(GenerateTechnicalMemorySection::class, function (GenerateTechnicalMemorySection $job): bool {
         return $job->technicalMemorySectionId > 0
             && $job->qualityAttempt === 1
-            && $job->context->qualityFeedback !== null;
+            && $job->context->qualityFeedback !== null
+            && is_string($job->context->runId)
+            && $job->context->runId !== '';
     });
 });

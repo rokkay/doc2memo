@@ -54,6 +54,8 @@ it('resets and requeues a single section regeneration', function (): void {
     expect($memory?->generated_at)->toBeNull();
 
     Queue::assertPushed(GenerateTechnicalMemorySection::class, function (GenerateTechnicalMemorySection $job) use ($section): bool {
-        return $job->technicalMemorySectionId === $section?->id;
+        return $job->technicalMemorySectionId === $section?->id
+            && is_string($job->context->runId)
+            && $job->context->runId !== '';
     });
 });

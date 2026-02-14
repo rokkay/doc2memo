@@ -15,6 +15,7 @@ final class TechnicalMemoryGenerationContextData
         public readonly array $ppt,
         public readonly string $memoryTitle,
         public readonly ?string $qualityFeedback = null,
+        public readonly ?string $runId = null,
     ) {}
 
     /**
@@ -27,6 +28,7 @@ final class TechnicalMemoryGenerationContextData
             ppt: is_array($payload['ppt'] ?? null) ? $payload['ppt'] : [],
             memoryTitle: (string) ($payload['memory_title'] ?? ''),
             qualityFeedback: isset($payload['quality_feedback']) ? (string) $payload['quality_feedback'] : null,
+            runId: isset($payload['run_id']) ? (string) $payload['run_id'] : null,
         );
     }
 
@@ -37,11 +39,23 @@ final class TechnicalMemoryGenerationContextData
             ppt: $this->ppt,
             memoryTitle: $this->memoryTitle,
             qualityFeedback: $qualityFeedback,
+            runId: $this->runId,
+        );
+    }
+
+    public function withRunId(string $runId): self
+    {
+        return new self(
+            pca: $this->pca,
+            ppt: $this->ppt,
+            memoryTitle: $this->memoryTitle,
+            qualityFeedback: $this->qualityFeedback,
+            runId: $runId,
         );
     }
 
     /**
-     * @return array{pca:array<string,mixed>,ppt:array<string,mixed>,memory_title:string,quality_feedback:?string}
+     * @return array{pca:array<string,mixed>,ppt:array<string,mixed>,memory_title:string,quality_feedback:?string,run_id:?string}
      */
     public function toArray(): array
     {
@@ -50,6 +64,7 @@ final class TechnicalMemoryGenerationContextData
             'ppt' => $this->ppt,
             'memory_title' => $this->memoryTitle,
             'quality_feedback' => $this->qualityFeedback,
+            'run_id' => $this->runId,
         ];
     }
 }

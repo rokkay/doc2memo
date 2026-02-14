@@ -88,6 +88,7 @@ final class GenerateTechnicalMemoryAction
             pca: $pcaData,
             ppt: $pptData,
             memoryTitle: (string) ('Memoria Técnica - '.$tender->title),
+            runId: (string) Str::uuid(),
         );
 
         $memory = $tender->technicalMemory()->updateOrCreate(

@@ -12,6 +12,7 @@ use App\Jobs\GenerateTechnicalMemorySection;
 use App\Models\TechnicalMemory;
 use App\Models\TechnicalMemorySection;
 use App\Models\Tender;
+use Illuminate\Support\Str;
 
 final class RegenerateSectionAction
 {
@@ -55,6 +56,7 @@ final class RegenerateSectionAction
                 'insights' => $this->buildInsightsPayload($tender, optional($tender->pptDocument)->id),
             ],
             memoryTitle: (string) $memory->title,
+            runId: (string) Str::uuid(),
         );
 
         $memory->update([
