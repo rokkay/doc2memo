@@ -280,3 +280,81 @@ it('filters metrics by date range', function (): void {
         ->and($result->global['estimated_dedicated_extractor_cost_usd'])->toBe(0.05)
         ->and($result->dailyTrend)->toHaveCount(1);
 });
+
+it('aggregates costs defensively when breakdown payloads are missing or malformed', function (): void {
+    $tender = Tender::factory()->create();
+    $memory = TechnicalMemory::factory()->create(['tender_id' => $tender->id]);
+    $section = TechnicalMemorySection::factory()->create(['technical_memory_id' => $memory->id]);
+
+    TechnicalMemoryGenerationMetric::query()->forceCreate([
+        'technical_memory_id' => $memory->id,
+        'technical_memory_section_id' => $section->id,
+        'run_id' => 'run-malformed-1',
+        'attempt' => 1,
+        'status' => 'completed',
+        'quality_passed' => true,
+        'quality_reasons' => [],
+        'duration_ms' => 1000,
+        'output_chars' => 1500,
+        'model_name' => 'gpt-5-mini',
+        'estimated_input_units' => 0.001,
+        'estimated_output_units' => 0.001,
+        'estimated_cost_usd' => 0.1,
+        'agent_cost_breakdown' => null,
+        'created_at' => CarbonImmutable::parse('2026-02-11 09:00:00'),
+        'updated_at' => CarbonImmutable::parse('2026-02-11 09:00:00'),
+    ]);
+
+    TechnicalMemoryGenerationMetric::query()->forceCreate([
+        'technical_memory_id' => $memory->id,
+        'technical_memory_section_id' => $section->id,
+        'run_id' => 'run-malformed-2',
+        'attempt' => 1,
+        'status' => 'completed',
+        'quality_passed' => true,
+        'quality_reasons' => [],
+        'duration_ms' => 1100,
+        'output_chars' => 1600,
+        'model_name' => 'gpt-5-mini',
+        'estimated_input_units' => 0.001,
+        'estimated_output_units' => 0.001,
+        'estimated_cost_usd' => 0.2,
+        'agent_cost_breakdown' => ['dynamic_section' => 'invalid'],
+        'created_at' => CarbonImmutable::parse('2026-02-11 09:30:00'),
+        'updated_at' => CarbonImmutable::parse('2026-02-11 09:30:00'),
+    ]);
+
+    Document::factory()->create([
+        'tender_id' => $tender->id,
+        'document_type' => 'pca',
+        'status' => 'analyzed',
+        'estimated_analysis_input_units' => 0.005,
+        'estimated_analysis_output_units' => 0.001,
+        'estimated_analysis_cost_usd' => 0.12,
+        'analysis_cost_breakdown' => null,
+        'analyzed_at' => CarbonImmutable::parse('2026-02-11 10:00:00'),
+    ]);
+
+    Document::factory()->create([
+        'tender_id' => $tender->id,
+        'document_type' => 'ppt',
+        'status' => 'analyzed',
+        'estimated_analysis_input_units' => 0.006,
+        'estimated_analysis_output_units' => 0.002,
+        'estimated_analysis_cost_usd' => 0.18,
+        'analysis_cost_breakdown' => ['document_analyzer' => 'invalid'],
+        'analyzed_at' => CarbonImmutable::parse('2026-02-11 11:00:00'),
+    ]);
+
+    $result = (new GetOperationalMetricsAction)(
+        from: CarbonImmutable::parse('2026-02-11 00:00:00'),
+        to: CarbonImmutable::parse('2026-02-11 23:59:59'),
+    );
+
+    expect($result->global['estimated_cost_usd'])->toBe(0.3)
+        ->and($result->global['estimated_dynamic_cost_usd'])->toBe(0.0)
+        ->and($result->global['estimated_style_editor_cost_usd'])->toBe(0.0)
+        ->and($result->global['estimated_document_analysis_cost_usd'])->toBe(0.3)
+        ->and($result->global['estimated_document_analyzer_cost_usd'])->toBe(0.0)
+        ->and($result->global['estimated_dedicated_extractor_cost_usd'])->toBe(0.0);
+});

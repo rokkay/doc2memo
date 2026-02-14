@@ -8,6 +8,7 @@ use App\Data\TechnicalMemoryOperationalMetricsData;
 use App\Models\Document;
 use App\Models\TechnicalMemoryGenerationMetric;
 use Carbon\CarbonInterface;
+use Closure;
 use Illuminate\Support\Collection;
 
 final class GetOperationalMetricsAction
@@ -206,15 +207,11 @@ final class GetOperationalMetricsAction
      */
     private function sumAgentCost(Collection $metrics, string $agentKey): float
     {
-        return round((float) $metrics->sum(function (TechnicalMemoryGenerationMetric $metric) use ($agentKey): float {
-            $breakdown = $metric->agent_cost_breakdown;
-
-            if (is_array($breakdown)) {
-                return (float) data_get($breakdown, $agentKey.'.estimated_cost_usd', 0.0);
-            }
-
-            return 0.0;
-        }), 6);
+        return $this->sumBreakdownAgentCost(
+            items: $metrics,
+            breakdownResolver: fn (TechnicalMemoryGenerationMetric $metric): mixed => $metric->agent_cost_breakdown,
+            agentKey: $agentKey,
+        );
     }
 
     /**
@@ -222,14 +219,27 @@ final class GetOperationalMetricsAction
      */
     private function sumDocumentAgentCost(Collection $documents, string $agentKey): float
     {
-        return round((float) $documents->sum(function (Document $document) use ($agentKey): float {
-            $breakdown = $document->analysis_cost_breakdown;
+        return $this->sumBreakdownAgentCost(
+            items: $documents,
+            breakdownResolver: fn (Document $document): mixed => $document->analysis_cost_breakdown,
+            agentKey: $agentKey,
+        );
+    }
 
-            if (is_array($breakdown)) {
-                return (float) data_get($breakdown, $agentKey.'.estimated_cost_usd', 0.0);
+    /**
+     * @param  Collection<int,mixed>  $items
+     * @param  Closure(mixed):mixed  $breakdownResolver
+     */
+    private function sumBreakdownAgentCost(Collection $items, Closure $breakdownResolver, string $agentKey): float
+    {
+        return round((float) $items->sum(function (mixed $item) use ($breakdownResolver, $agentKey): float {
+            $breakdown = $breakdownResolver($item);
+
+            if (! is_array($breakdown)) {
+                return 0.0;
             }
 
-            return 0.0;
+            return (float) data_get($breakdown, $agentKey.'.estimated_cost_usd', 0.0);
         }), 6);
     }
 }
