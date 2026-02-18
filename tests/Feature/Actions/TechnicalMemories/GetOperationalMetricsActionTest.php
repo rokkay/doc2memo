@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Actions\TechnicalMemories\GetOperationalMetricsAction;
+use App\Enums\AiCostCategory;
+use App\Models\AiCostEntry;
 use App\Models\Document;
 use App\Models\TechnicalMemory;
 use App\Models\TechnicalMemoryGenerationMetric;
@@ -13,7 +15,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-it('calculates global kpis durations and per memory rollups', function (): void {
+it('calculates global kpis durations and unified ai cost rollups', function (): void {
     $tender = Tender::factory()->create();
 
     $memoryA = TechnicalMemory::factory()->create([
@@ -41,7 +43,7 @@ it('calculates global kpis durations and per memory rollups', function (): void 
         'section_title' => 'Section C',
     ]);
 
-    TechnicalMemoryGenerationMetric::query()->forceCreate([
+    $metricA1 = TechnicalMemoryGenerationMetric::query()->forceCreate([
         'technical_memory_id' => $memoryA->id,
         'technical_memory_section_id' => $sectionA->id,
         'run_id' => 'run-a',
@@ -52,18 +54,11 @@ it('calculates global kpis durations and per memory rollups', function (): void 
         'duration_ms' => 1000,
         'output_chars' => 1800,
         'model_name' => 'gpt-5-mini',
-        'estimated_input_units' => 0.001,
-        'estimated_output_units' => 0.001,
-        'estimated_cost_usd' => 0.1,
-        'agent_cost_breakdown' => [
-            'dynamic_section' => ['estimated_cost_usd' => 0.07],
-            'style_editor' => ['estimated_cost_usd' => 0.03],
-        ],
         'created_at' => CarbonImmutable::parse('2026-02-10 10:00:00'),
         'updated_at' => CarbonImmutable::parse('2026-02-10 10:00:00'),
     ]);
 
-    TechnicalMemoryGenerationMetric::query()->forceCreate([
+    $metricA2 = TechnicalMemoryGenerationMetric::query()->forceCreate([
         'technical_memory_id' => $memoryA->id,
         'technical_memory_section_id' => $sectionB->id,
         'run_id' => 'run-a',
@@ -74,18 +69,11 @@ it('calculates global kpis durations and per memory rollups', function (): void 
         'duration_ms' => 2000,
         'output_chars' => 500,
         'model_name' => 'gpt-5-mini',
-        'estimated_input_units' => 0.001,
-        'estimated_output_units' => 0.001,
-        'estimated_cost_usd' => 0.2,
-        'agent_cost_breakdown' => [
-            'dynamic_section' => ['estimated_cost_usd' => 0.14],
-            'style_editor' => ['estimated_cost_usd' => 0.06],
-        ],
         'created_at' => CarbonImmutable::parse('2026-02-10 10:05:00'),
         'updated_at' => CarbonImmutable::parse('2026-02-10 10:05:00'),
     ]);
 
-    TechnicalMemoryGenerationMetric::query()->forceCreate([
+    $metricA3 = TechnicalMemoryGenerationMetric::query()->forceCreate([
         'technical_memory_id' => $memoryA->id,
         'technical_memory_section_id' => $sectionB->id,
         'run_id' => 'run-a',
@@ -96,18 +84,11 @@ it('calculates global kpis durations and per memory rollups', function (): void 
         'duration_ms' => 3000,
         'output_chars' => 1900,
         'model_name' => 'gpt-5-mini',
-        'estimated_input_units' => 0.001,
-        'estimated_output_units' => 0.001,
-        'estimated_cost_usd' => 0.15,
-        'agent_cost_breakdown' => [
-            'dynamic_section' => ['estimated_cost_usd' => 0.1],
-            'style_editor' => ['estimated_cost_usd' => 0.05],
-        ],
         'created_at' => CarbonImmutable::parse('2026-02-11 11:00:00'),
         'updated_at' => CarbonImmutable::parse('2026-02-11 11:00:00'),
     ]);
 
-    TechnicalMemoryGenerationMetric::query()->forceCreate([
+    $metricB1 = TechnicalMemoryGenerationMetric::query()->forceCreate([
         'technical_memory_id' => $memoryB->id,
         'technical_memory_section_id' => $sectionC->id,
         'run_id' => 'run-b',
@@ -118,44 +99,78 @@ it('calculates global kpis durations and per memory rollups', function (): void 
         'duration_ms' => 500,
         'output_chars' => 2000,
         'model_name' => 'gpt-5.2',
-        'estimated_input_units' => 0.001,
-        'estimated_output_units' => 0.001,
-        'estimated_cost_usd' => 0.05,
-        'agent_cost_breakdown' => [
-            'dynamic_section' => ['estimated_cost_usd' => 0.04],
-            'style_editor' => ['estimated_cost_usd' => 0.01],
-        ],
         'created_at' => CarbonImmutable::parse('2026-02-11 12:00:00'),
         'updated_at' => CarbonImmutable::parse('2026-02-11 12:00:00'),
     ]);
 
-    Document::factory()->create([
+    $document = Document::factory()->create([
         'tender_id' => $tender->id,
         'document_type' => 'pca',
         'status' => 'analyzed',
-        'estimated_analysis_input_units' => 0.004,
-        'estimated_analysis_output_units' => 0.001,
-        'estimated_analysis_cost_usd' => 0.09,
-        'analysis_cost_breakdown' => [
-            'document_analyzer' => ['estimated_cost_usd' => 0.06],
-            'dedicated_judgment_extractor' => ['estimated_cost_usd' => 0.03],
-        ],
         'analyzed_at' => CarbonImmutable::parse('2026-02-11 13:00:00'),
+    ]);
+
+    foreach ([
+        [$metricA1, AiCostCategory::DynamicSection, 'dynamic_section', 0.07, '2026-02-10 10:00:00'],
+        [$metricA1, AiCostCategory::StyleEditor, 'style_editor', 0.03, '2026-02-10 10:00:01'],
+        [$metricA2, AiCostCategory::DynamicSection, 'dynamic_section', 0.14, '2026-02-10 10:05:00'],
+        [$metricA2, AiCostCategory::StyleEditor, 'style_editor', 0.06, '2026-02-10 10:05:01'],
+        [$metricA3, AiCostCategory::DynamicSection, 'dynamic_section', 0.10, '2026-02-11 11:00:00'],
+        [$metricA3, AiCostCategory::StyleEditor, 'style_editor', 0.05, '2026-02-11 11:00:01'],
+        [$metricB1, AiCostCategory::DynamicSection, 'dynamic_section', 0.04, '2026-02-11 12:00:00'],
+        [$metricB1, AiCostCategory::StyleEditor, 'style_editor', 0.01, '2026-02-11 12:00:01'],
+    ] as [$metric, $category, $agentKey, $costUsd, $createdAt]) {
+        AiCostEntry::query()->forceCreate([
+            'tender_id' => $tender->id,
+            'technical_memory_id' => $metric->technical_memory_id,
+            'technical_memory_section_id' => $metric->technical_memory_section_id,
+            'technical_memory_generation_metric_id' => $metric->id,
+            'run_id' => $metric->run_id,
+            'attempt' => $metric->attempt,
+            'category' => $category,
+            'agent_key' => $agentKey,
+            'model_name' => $metric->model_name,
+            'status' => 'completed',
+            'estimated_input_units' => 0.001,
+            'estimated_output_units' => 0.001,
+            'estimated_cost_usd' => $costUsd,
+            'created_at' => CarbonImmutable::parse($createdAt),
+            'updated_at' => CarbonImmutable::parse($createdAt),
+        ]);
+    }
+
+    AiCostEntry::query()->forceCreate([
+        'tender_id' => $tender->id,
+        'document_id' => $document->id,
+        'category' => AiCostCategory::DocumentAnalyzer,
+        'agent_key' => 'document_analyzer',
+        'model_name' => 'gpt-5.2',
+        'status' => 'completed',
+        'estimated_input_units' => 0.002,
+        'estimated_output_units' => 0.001,
+        'estimated_cost_usd' => 0.06,
+        'created_at' => CarbonImmutable::parse('2026-02-11 13:00:00'),
+        'updated_at' => CarbonImmutable::parse('2026-02-11 13:00:00'),
+    ]);
+
+    AiCostEntry::query()->forceCreate([
+        'tender_id' => $tender->id,
+        'document_id' => $document->id,
+        'category' => AiCostCategory::DedicatedJudgmentExtractor,
+        'agent_key' => 'dedicated_judgment_extractor',
+        'model_name' => 'gpt-5-mini',
+        'status' => 'completed',
+        'estimated_input_units' => 0.001,
+        'estimated_output_units' => 0.001,
+        'estimated_cost_usd' => 0.03,
+        'created_at' => CarbonImmutable::parse('2026-02-11 13:00:01'),
+        'updated_at' => CarbonImmutable::parse('2026-02-11 13:00:01'),
     ]);
 
     $result = (new GetOperationalMetricsAction)(
         from: CarbonImmutable::parse('2026-02-10 00:00:00'),
         to: CarbonImmutable::parse('2026-02-11 23:59:59'),
     );
-
-    expect($result->global)->toHaveKeys([
-        'estimated_cost_usd',
-        'estimated_dynamic_cost_usd',
-        'estimated_style_editor_cost_usd',
-        'estimated_document_analysis_cost_usd',
-        'estimated_document_analyzer_cost_usd',
-        'estimated_dedicated_extractor_cost_usd',
-    ]);
 
     expect($result->global['first_pass_rate'])->toBe(50.0)
         ->and($result->global['retry_rate'])->toBe(25.0)
@@ -179,12 +194,12 @@ it('calculates global kpis durations and per memory rollups', function (): void 
         ->and($result->topProblematicSections[0]['section_title'])->toBe('Section B');
 });
 
-it('filters metrics by date range', function (): void {
+it('filters unified costs by date range', function (): void {
     $tender = Tender::factory()->create();
     $memory = TechnicalMemory::factory()->create(['tender_id' => $tender->id]);
     $section = TechnicalMemorySection::factory()->create(['technical_memory_id' => $memory->id]);
 
-    TechnicalMemoryGenerationMetric::query()->forceCreate([
+    $metric = TechnicalMemoryGenerationMetric::query()->forceCreate([
         'technical_memory_id' => $memory->id,
         'technical_memory_section_id' => $section->id,
         'run_id' => 'run-filter-1',
@@ -192,83 +207,88 @@ it('filters metrics by date range', function (): void {
         'status' => 'completed',
         'quality_passed' => true,
         'quality_reasons' => [],
-        'duration_ms' => 1000,
-        'output_chars' => 1800,
-        'model_name' => 'gpt-5-mini',
-        'estimated_input_units' => 0.001,
-        'estimated_output_units' => 0.001,
-        'estimated_cost_usd' => 0.2,
-        'agent_cost_breakdown' => [
-            'dynamic_section' => ['estimated_cost_usd' => 0.14],
-            'style_editor' => ['estimated_cost_usd' => 0.06],
-        ],
-        'created_at' => CarbonImmutable::parse('2026-02-10 10:00:00'),
-        'updated_at' => CarbonImmutable::parse('2026-02-10 10:00:00'),
-    ]);
-
-    TechnicalMemoryGenerationMetric::query()->forceCreate([
-        'technical_memory_id' => $memory->id,
-        'technical_memory_section_id' => $section->id,
-        'run_id' => 'run-filter-2',
-        'attempt' => 1,
-        'status' => 'completed',
-        'quality_passed' => true,
-        'quality_reasons' => [],
         'duration_ms' => 900,
-        'output_chars' => 1750,
+        'output_chars' => 1500,
         'model_name' => 'gpt-5-mini',
-        'estimated_input_units' => 0.001,
-        'estimated_output_units' => 0.001,
-        'estimated_cost_usd' => 0.3,
-        'agent_cost_breakdown' => [
-            'dynamic_section' => ['estimated_cost_usd' => 0.21],
-            'style_editor' => ['estimated_cost_usd' => 0.09],
-        ],
         'created_at' => CarbonImmutable::parse('2026-02-11 10:00:00'),
         'updated_at' => CarbonImmutable::parse('2026-02-11 10:00:00'),
     ]);
 
-    Document::factory()->create([
-        'tender_id' => $tender->id,
-        'document_type' => 'ppt',
-        'status' => 'analyzed',
-        'estimated_analysis_input_units' => 0.005,
-        'estimated_analysis_output_units' => 0.002,
-        'estimated_analysis_cost_usd' => 0.12,
-        'analysis_cost_breakdown' => [
-            'document_analyzer' => ['estimated_cost_usd' => 0.12],
-            'dedicated_judgment_extractor' => ['estimated_cost_usd' => 0.0],
-        ],
-        'analyzed_at' => CarbonImmutable::parse('2026-02-10 08:00:00'),
-    ]);
-
-    Document::factory()->create([
+    $document = Document::factory()->create([
         'tender_id' => $tender->id,
         'document_type' => 'pca',
         'status' => 'analyzed',
-        'estimated_analysis_input_units' => 0.006,
-        'estimated_analysis_output_units' => 0.002,
-        'estimated_analysis_cost_usd' => 0.18,
-        'analysis_cost_breakdown' => [
-            'document_analyzer' => ['estimated_cost_usd' => 0.13],
-            'dedicated_judgment_extractor' => ['estimated_cost_usd' => 0.05],
-        ],
         'analyzed_at' => CarbonImmutable::parse('2026-02-11 08:00:00'),
+    ]);
+
+    AiCostEntry::query()->forceCreate([
+        'tender_id' => $tender->id,
+        'technical_memory_id' => $memory->id,
+        'technical_memory_section_id' => $section->id,
+        'technical_memory_generation_metric_id' => $metric->id,
+        'run_id' => 'run-filter-1',
+        'attempt' => 1,
+        'category' => AiCostCategory::DynamicSection,
+        'agent_key' => 'dynamic_section',
+        'model_name' => 'gpt-5-mini',
+        'status' => 'completed',
+        'estimated_input_units' => 0.001,
+        'estimated_output_units' => 0.001,
+        'estimated_cost_usd' => 0.21,
+        'created_at' => CarbonImmutable::parse('2026-02-11 10:00:00'),
+        'updated_at' => CarbonImmutable::parse('2026-02-11 10:00:00'),
+    ]);
+
+    AiCostEntry::query()->forceCreate([
+        'tender_id' => $tender->id,
+        'technical_memory_id' => $memory->id,
+        'technical_memory_section_id' => $section->id,
+        'technical_memory_generation_metric_id' => $metric->id,
+        'run_id' => 'run-filter-1',
+        'attempt' => 1,
+        'category' => AiCostCategory::StyleEditor,
+        'agent_key' => 'style_editor',
+        'model_name' => 'gpt-5-mini',
+        'status' => 'completed',
+        'estimated_input_units' => 0.001,
+        'estimated_output_units' => 0.001,
+        'estimated_cost_usd' => 0.09,
+        'created_at' => CarbonImmutable::parse('2026-02-11 10:00:01'),
+        'updated_at' => CarbonImmutable::parse('2026-02-11 10:00:01'),
+    ]);
+
+    AiCostEntry::query()->forceCreate([
+        'tender_id' => $tender->id,
+        'document_id' => $document->id,
+        'category' => AiCostCategory::DocumentAnalyzer,
+        'agent_key' => 'document_analyzer',
+        'model_name' => 'gpt-5.2',
+        'status' => 'completed',
+        'estimated_input_units' => 0.001,
+        'estimated_output_units' => 0.001,
+        'estimated_cost_usd' => 0.13,
+        'created_at' => CarbonImmutable::parse('2026-02-11 08:00:00'),
+        'updated_at' => CarbonImmutable::parse('2026-02-11 08:00:00'),
+    ]);
+
+    AiCostEntry::query()->forceCreate([
+        'tender_id' => $tender->id,
+        'document_id' => $document->id,
+        'category' => AiCostCategory::DedicatedJudgmentExtractor,
+        'agent_key' => 'dedicated_judgment_extractor',
+        'model_name' => 'gpt-5-mini',
+        'status' => 'completed',
+        'estimated_input_units' => 0.001,
+        'estimated_output_units' => 0.001,
+        'estimated_cost_usd' => 0.05,
+        'created_at' => CarbonImmutable::parse('2026-02-11 08:00:01'),
+        'updated_at' => CarbonImmutable::parse('2026-02-11 08:00:01'),
     ]);
 
     $result = (new GetOperationalMetricsAction)(
         from: CarbonImmutable::parse('2026-02-11 00:00:00'),
         to: CarbonImmutable::parse('2026-02-11 23:59:59'),
     );
-
-    expect($result->global)->toHaveKeys([
-        'estimated_cost_usd',
-        'estimated_dynamic_cost_usd',
-        'estimated_style_editor_cost_usd',
-        'estimated_document_analysis_cost_usd',
-        'estimated_document_analyzer_cost_usd',
-        'estimated_dedicated_extractor_cost_usd',
-    ]);
 
     expect($result->global['attempts'])->toBe(1)
         ->and($result->global['estimated_cost_usd'])->toBe(0.3)
@@ -281,7 +301,7 @@ it('filters metrics by date range', function (): void {
         ->and($result->dailyTrend)->toHaveCount(1);
 });
 
-it('aggregates costs defensively when breakdown payloads are missing or malformed', function (): void {
+it('keeps unified cost totals in zero when there are no ai entries', function (): void {
     $tender = Tender::factory()->create();
     $memory = TechnicalMemory::factory()->create(['tender_id' => $tender->id]);
     $section = TechnicalMemorySection::factory()->create(['technical_memory_id' => $memory->id]);
@@ -289,7 +309,7 @@ it('aggregates costs defensively when breakdown payloads are missing or malforme
     TechnicalMemoryGenerationMetric::query()->forceCreate([
         'technical_memory_id' => $memory->id,
         'technical_memory_section_id' => $section->id,
-        'run_id' => 'run-malformed-1',
+        'run_id' => 'run-empty',
         'attempt' => 1,
         'status' => 'completed',
         'quality_passed' => true,
@@ -297,53 +317,15 @@ it('aggregates costs defensively when breakdown payloads are missing or malforme
         'duration_ms' => 1000,
         'output_chars' => 1500,
         'model_name' => 'gpt-5-mini',
-        'estimated_input_units' => 0.001,
-        'estimated_output_units' => 0.001,
-        'estimated_cost_usd' => 0.1,
-        'agent_cost_breakdown' => null,
         'created_at' => CarbonImmutable::parse('2026-02-11 09:00:00'),
         'updated_at' => CarbonImmutable::parse('2026-02-11 09:00:00'),
-    ]);
-
-    TechnicalMemoryGenerationMetric::query()->forceCreate([
-        'technical_memory_id' => $memory->id,
-        'technical_memory_section_id' => $section->id,
-        'run_id' => 'run-malformed-2',
-        'attempt' => 1,
-        'status' => 'completed',
-        'quality_passed' => true,
-        'quality_reasons' => [],
-        'duration_ms' => 1100,
-        'output_chars' => 1600,
-        'model_name' => 'gpt-5-mini',
-        'estimated_input_units' => 0.001,
-        'estimated_output_units' => 0.001,
-        'estimated_cost_usd' => 0.2,
-        'agent_cost_breakdown' => ['dynamic_section' => 'invalid'],
-        'created_at' => CarbonImmutable::parse('2026-02-11 09:30:00'),
-        'updated_at' => CarbonImmutable::parse('2026-02-11 09:30:00'),
     ]);
 
     Document::factory()->create([
         'tender_id' => $tender->id,
         'document_type' => 'pca',
         'status' => 'analyzed',
-        'estimated_analysis_input_units' => 0.005,
-        'estimated_analysis_output_units' => 0.001,
-        'estimated_analysis_cost_usd' => 0.12,
-        'analysis_cost_breakdown' => null,
         'analyzed_at' => CarbonImmutable::parse('2026-02-11 10:00:00'),
-    ]);
-
-    Document::factory()->create([
-        'tender_id' => $tender->id,
-        'document_type' => 'ppt',
-        'status' => 'analyzed',
-        'estimated_analysis_input_units' => 0.006,
-        'estimated_analysis_output_units' => 0.002,
-        'estimated_analysis_cost_usd' => 0.18,
-        'analysis_cost_breakdown' => ['document_analyzer' => 'invalid'],
-        'analyzed_at' => CarbonImmutable::parse('2026-02-11 11:00:00'),
     ]);
 
     $result = (new GetOperationalMetricsAction)(
@@ -351,10 +333,10 @@ it('aggregates costs defensively when breakdown payloads are missing or malforme
         to: CarbonImmutable::parse('2026-02-11 23:59:59'),
     );
 
-    expect($result->global['estimated_cost_usd'])->toBe(0.3)
+    expect($result->global['estimated_cost_usd'])->toBe(0.0)
         ->and($result->global['estimated_dynamic_cost_usd'])->toBe(0.0)
         ->and($result->global['estimated_style_editor_cost_usd'])->toBe(0.0)
-        ->and($result->global['estimated_document_analysis_cost_usd'])->toBe(0.3)
+        ->and($result->global['estimated_document_analysis_cost_usd'])->toBe(0.0)
         ->and($result->global['estimated_document_analyzer_cost_usd'])->toBe(0.0)
         ->and($result->global['estimated_dedicated_extractor_cost_usd'])->toBe(0.0);
 });

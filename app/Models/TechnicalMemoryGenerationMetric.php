@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TechnicalMemoryGenerationMetric extends Model
 {
@@ -21,10 +22,6 @@ class TechnicalMemoryGenerationMetric extends Model
         'duration_ms',
         'output_chars',
         'model_name',
-        'estimated_input_units',
-        'estimated_output_units',
-        'estimated_cost_usd',
-        'agent_cost_breakdown',
     ];
 
     protected function casts(): array
@@ -35,10 +32,6 @@ class TechnicalMemoryGenerationMetric extends Model
             'quality_reasons' => 'array',
             'duration_ms' => 'integer',
             'output_chars' => 'integer',
-            'estimated_input_units' => 'decimal:4',
-            'estimated_output_units' => 'decimal:4',
-            'estimated_cost_usd' => 'decimal:6',
-            'agent_cost_breakdown' => 'array',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
@@ -52,5 +45,10 @@ class TechnicalMemoryGenerationMetric extends Model
     public function technicalMemorySection(): BelongsTo
     {
         return $this->belongsTo(TechnicalMemorySection::class);
+    }
+
+    public function aiCostEntries(): HasMany
+    {
+        return $this->hasMany(AiCostEntry::class);
     }
 }

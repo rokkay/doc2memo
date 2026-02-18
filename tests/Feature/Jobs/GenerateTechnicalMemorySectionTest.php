@@ -6,6 +6,7 @@ use App\Ai\Agents\TechnicalMemoryDynamicSectionAgent;
 use App\Ai\Agents\TechnicalMemorySectionEditorAgent;
 use App\Data\TechnicalMemoryGenerationContextData;
 use App\Data\TechnicalMemorySectionData;
+use App\Enums\AiCostCategory;
 use App\Enums\TechnicalMemorySectionStatus;
 use App\Jobs\GenerateTechnicalMemorySection;
 use App\Listeners\RecordAiUsageFromAgentPrompted;
@@ -15,6 +16,7 @@ use App\Models\TechnicalMemoryMetricEvent;
 use App\Models\TechnicalMemorySection;
 use App\Models\Tender;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 
 use function Pest\Laravel\assertDatabaseHas;
@@ -106,24 +108,37 @@ it('generates a section and keeps memory in draft when pending sections remain',
         ->latest('id')
         ->first();
 
-    $breakdown = $metric?->agent_cost_breakdown;
-    $breakdownTotal = round(
-        (float) data_get($breakdown, 'dynamic_section.estimated_cost_usd', 0)
-        + (float) data_get($breakdown, 'style_editor.estimated_cost_usd', 0),
-        6,
-    );
+    $aiCostEntries = DB::table('ai_cost_entries')
+        ->where('technical_memory_generation_metric_id', $metric?->id)
+        ->get();
+
+    $aiCostTotal = round((float) $aiCostEntries->sum('estimated_cost_usd'), 6);
 
     expect($metric)->not->toBeNull()
         ->and($metric?->attempt)->toBe(1)
         ->and($metric?->duration_ms)->toBeGreaterThanOrEqual(0)
         ->and($metric?->quality_passed)->toBeTrue()
         ->and($metric?->output_chars)->toBeGreaterThan(0)
-        ->and((float) $metric?->estimated_cost_usd)->toBeGreaterThan(0.0)
-        ->and((float) $metric?->estimated_cost_usd)->toBe($breakdownTotal)
-        ->and($breakdown)->toBeArray()
-        ->and($breakdown)->toHaveKeys(['dynamic_section', 'style_editor'])
-        ->and(data_get($breakdown, 'dynamic_section.status'))->toBe('completed')
-        ->and(data_get($breakdown, 'style_editor.status'))->toBe('completed');
+        ->and($aiCostTotal)->toBeGreaterThan(0.0)
+        ->and($aiCostEntries->count())->toBe(2);
+
+    assertDatabaseHas('ai_cost_entries', [
+        'technical_memory_id' => $memory->id,
+        'technical_memory_section_id' => $section->id,
+        'technical_memory_generation_metric_id' => $metric?->id,
+        'category' => AiCostCategory::DynamicSection->value,
+        'agent_key' => 'dynamic_section',
+        'status' => 'completed',
+    ]);
+
+    assertDatabaseHas('ai_cost_entries', [
+        'technical_memory_id' => $memory->id,
+        'technical_memory_section_id' => $section->id,
+        'technical_memory_generation_metric_id' => $metric?->id,
+        'category' => AiCostCategory::StyleEditor->value,
+        'agent_key' => 'style_editor',
+        'status' => 'completed',
+    ]);
 });
 
 it('marks memory as generated when all dynamic sections finish', function (): void {
@@ -253,27 +268,22 @@ it('retries once when generated section does not meet quality gate', function ()
         ->latest('id')
         ->first();
 
-    $breakdown = $metric?->agent_cost_breakdown;
-    $breakdownTotal = round(
-        (float) data_get($breakdown, 'dynamic_section.estimated_cost_usd', 0)
-        + (float) data_get($breakdown, 'style_editor.estimated_cost_usd', 0),
-        6,
-    );
+    $aiCostEntries = DB::table('ai_cost_entries')
+        ->where('technical_memory_generation_metric_id', $metric?->id)
+        ->get();
+
+    $aiCostTotal = round((float) $aiCostEntries->sum('estimated_cost_usd'), 6);
 
     expect($metric)->not->toBeNull()
         ->and($metric?->attempt)->toBe(1)
         ->and($metric?->duration_ms)->toBeGreaterThanOrEqual(0)
         ->and($metric?->quality_passed)->toBeFalse()
         ->and($metric?->output_chars)->toBeGreaterThan(0)
-        ->and((float) $metric?->estimated_cost_usd)->toBeGreaterThan(0.0)
-        ->and((float) $metric?->estimated_cost_usd)->toBe($breakdownTotal)
-        ->and($breakdown)->toBeArray()
-        ->and($breakdown)->toHaveKeys(['dynamic_section', 'style_editor'])
-        ->and(data_get($breakdown, 'dynamic_section.status'))->toBe('completed')
-        ->and(data_get($breakdown, 'style_editor.status'))->toBe('completed');
+        ->and($aiCostTotal)->toBeGreaterThan(0.0)
+        ->and($aiCostEntries->count())->toBe(2);
 });
 
-it('persists skipped style editor metrics and keeps total cost aligned with breakdown', function (): void {
+it('persists skipped style editor ai entries and keeps total cost aligned', function (): void {
     config()->set('technical_memory.style_editor.enabled', false);
 
     $tender = Tender::factory()->create();
@@ -324,19 +334,22 @@ it('persists skipped style editor metrics and keeps total cost aligned with brea
         ->latest('id')
         ->first();
 
-    $breakdown = $metric?->agent_cost_breakdown;
-    $breakdownTotal = round(
-        (float) data_get($breakdown, 'dynamic_section.estimated_cost_usd', 0)
-        + (float) data_get($breakdown, 'style_editor.estimated_cost_usd', 0),
-        6,
-    );
+    $dynamicEntry = DB::table('ai_cost_entries')
+        ->where('technical_memory_generation_metric_id', $metric?->id)
+        ->where('agent_key', 'dynamic_section')
+        ->first();
+
+    $styleEntry = DB::table('ai_cost_entries')
+        ->where('technical_memory_generation_metric_id', $metric?->id)
+        ->where('agent_key', 'style_editor')
+        ->first();
 
     expect($metric)->not->toBeNull()
-        ->and($breakdown)->toBeArray()
-        ->and(data_get($breakdown, 'dynamic_section.status'))->toBe('completed')
-        ->and(data_get($breakdown, 'style_editor.status'))->toBe('skipped')
-        ->and((float) data_get($breakdown, 'style_editor.estimated_cost_usd'))->toBe(0.0)
-        ->and((float) $metric?->estimated_cost_usd)->toBe($breakdownTotal);
+        ->and($dynamicEntry)->not->toBeNull()
+        ->and($styleEntry)->not->toBeNull()
+        ->and($dynamicEntry?->status)->toBe('completed')
+        ->and($styleEntry?->status)->toBe('skipped')
+        ->and((float) ($styleEntry?->estimated_cost_usd ?? 1))->toBe(0.0);
 });
 
 it('stores token usage metadata when sdk usage is available and keeps char fallback metadata', function (): void {
@@ -403,14 +416,22 @@ it('stores token usage metadata when sdk usage is available and keeps char fallb
         ->latest('id')
         ->first();
 
-    $breakdown = $metric?->agent_cost_breakdown;
+    $dynamicEntry = DB::table('ai_cost_entries')
+        ->where('technical_memory_generation_metric_id', $metric?->id)
+        ->where('agent_key', 'dynamic_section')
+        ->first();
 
-    expect(data_get($breakdown, 'dynamic_section.token_usage.available'))->toBeTrue()
-        ->and((int) data_get($breakdown, 'dynamic_section.token_usage.prompt_tokens'))->toBeGreaterThanOrEqual(0)
-        ->and(data_get($breakdown, 'style_editor.token_usage.available'))->toBeBool()
-        ->and((int) data_get($breakdown, 'style_editor.token_usage.completion_tokens'))->toBeGreaterThanOrEqual(0)
-        ->and((int) data_get($breakdown, 'dynamic_section.char_estimate_fallback.input_chars'))->toBeGreaterThan(0)
-        ->and((int) data_get($breakdown, 'style_editor.char_estimate_fallback.output_chars'))->toBeGreaterThanOrEqual(0);
+    $styleEntry = DB::table('ai_cost_entries')
+        ->where('technical_memory_generation_metric_id', $metric?->id)
+        ->where('agent_key', 'style_editor')
+        ->first();
+
+    expect($dynamicEntry)->not->toBeNull()
+        ->and($styleEntry)->not->toBeNull()
+        ->and((int) ($dynamicEntry?->prompt_tokens ?? 0))->toBeGreaterThanOrEqual(0)
+        ->and((int) ($styleEntry?->completion_tokens ?? 0))->toBeGreaterThanOrEqual(0)
+        ->and((int) ($dynamicEntry?->input_chars ?? 0))->toBeGreaterThan(0)
+        ->and((int) ($styleEntry?->output_chars ?? 0))->toBeGreaterThanOrEqual(0);
 
     RecordAiUsageFromAgentPrompted::flush();
 });

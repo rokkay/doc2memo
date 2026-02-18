@@ -14,7 +14,9 @@ return new class extends Migration
         Schema::create('technical_memory_generation_metrics', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('technical_memory_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('technical_memory_section_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('technical_memory_section_id')
+                ->constrained(table: 'technical_memory_sections', indexName: 'tmgm_tms_id_idx')
+                ->cascadeOnDelete();
             $table->uuid('run_id');
             $table->unsignedInteger('attempt');
             $table->string('status');
@@ -28,9 +30,9 @@ return new class extends Migration
             $table->decimal('estimated_cost_usd', total: 12, places: 6);
             $table->timestamps();
 
-            $table->index(['technical_memory_id', 'created_at']);
-            $table->index(['technical_memory_section_id', 'created_at']);
-            $table->index(['status', 'created_at']);
+            $table->index(['technical_memory_id', 'created_at'], 'tmgm_tm_created_idx');
+            $table->index(['technical_memory_section_id', 'created_at'], 'tmgm_tms_created_idx');
+            $table->index(['status', 'created_at'], 'tmgm_status_created_idx');
         });
     }
 

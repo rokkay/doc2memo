@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace App\Actions\TechnicalMemories;
 
 use App\Data\TechnicalMemoryOperationalMetricsData;
+use App\Enums\AiCostCategory;
+use App\Models\AiCostEntry;
 use App\Models\Document;
 use App\Models\TechnicalMemoryGenerationMetric;
 use Carbon\CarbonInterface;
-use Closure;
 use Illuminate\Support\Collection;
 
 final class GetOperationalMetricsAction
@@ -20,17 +21,21 @@ final class GetOperationalMetricsAction
             ->whereBetween('created_at', [$from, $to])
             ->orderBy('created_at')
             ->get();
+        $costEntries = AiCostEntry::query()
+            ->whereBetween('created_at', [$from, $to])
+            ->orderBy('created_at')
+            ->get();
         $documents = Document::query()
             ->whereBetween('analyzed_at', [$from, $to])
             ->orderBy('analyzed_at')
             ->get();
 
         return new TechnicalMemoryOperationalMetricsData(
-            global: $this->buildGlobalKpis($metrics, $documents),
-            dailyTrend: $this->buildDailyTrend($metrics),
-            memories: $this->buildMemorySummaries($metrics),
+            global: $this->buildGlobalKpis($metrics, $documents, $costEntries),
+            dailyTrend: $this->buildDailyTrend($metrics, $costEntries),
+            memories: $this->buildMemorySummaries($metrics, $costEntries),
             topProblematicSections: $this->buildTopProblematicSections($metrics),
-            documentAnalysis: $this->buildDocumentAnalysisSummary($documents),
+            documentAnalysis: $this->buildDocumentAnalysisSummary($documents, $costEntries),
         );
     }
 
@@ -38,18 +43,22 @@ final class GetOperationalMetricsAction
      * @param  Collection<int,TechnicalMemoryGenerationMetric>  $metrics
      * @return array<string,int|float>
      */
-    private function buildGlobalKpis(Collection $metrics, Collection $documents): array
+    private function buildGlobalKpis(Collection $metrics, Collection $documents, Collection $costEntries): array
     {
         $attempts = $metrics->count();
         $firstPassCount = $metrics->where('status', 'completed')->where('attempt', 1)->count();
         $retryCount = $metrics->filter(fn (TechnicalMemoryGenerationMetric $metric): bool => $metric->attempt > 1)->count();
         $failureCount = $metrics->where('status', 'failed')->count();
         $avgDurationMs = $attempts > 0 ? (int) round((float) $metrics->avg('duration_ms')) : 0;
-        $dynamicSectionCostUsd = $this->sumAgentCost($metrics, 'dynamic_section');
-        $styleEditorCostUsd = $this->sumAgentCost($metrics, 'style_editor');
-        $documentAnalysisCostUsd = round((float) $documents->sum('estimated_analysis_cost_usd'), 6);
-        $documentAnalyzerCostUsd = $this->sumDocumentAgentCost($documents, 'document_analyzer');
-        $dedicatedExtractorCostUsd = $this->sumDocumentAgentCost($documents, 'dedicated_judgment_extractor');
+        $generationCostEntries = $this->generationCostEntries($costEntries);
+        $documentCostEntries = $this->documentCostEntries($costEntries);
+
+        $dynamicSectionCostUsd = $this->sumCostByCategory($generationCostEntries, AiCostCategory::DynamicSection);
+        $styleEditorCostUsd = $this->sumCostByCategory($generationCostEntries, AiCostCategory::StyleEditor);
+        $generationTotalCostUsd = round((float) $generationCostEntries->sum('estimated_cost_usd'), 6);
+        $documentAnalysisCostUsd = round((float) $documentCostEntries->sum('estimated_cost_usd'), 6);
+        $documentAnalyzerCostUsd = $this->sumCostByCategory($documentCostEntries, AiCostCategory::DocumentAnalyzer);
+        $dedicatedExtractorCostUsd = $this->sumCostByCategory($documentCostEntries, AiCostCategory::DedicatedJudgmentExtractor);
 
         return [
             'attempts' => $attempts,
@@ -58,7 +67,7 @@ final class GetOperationalMetricsAction
             'failure_rate' => $this->rate($failureCount, $attempts),
             'avg_duration_ms' => $avgDurationMs,
             'p95_duration_ms' => $this->p95Duration($metrics),
-            'estimated_cost_usd' => round((float) $metrics->sum('estimated_cost_usd'), 6),
+            'estimated_cost_usd' => $generationTotalCostUsd,
             'estimated_dynamic_cost_usd' => $dynamicSectionCostUsd,
             'estimated_style_editor_cost_usd' => $styleEditorCostUsd,
             'analyzed_documents' => $documents->count(),
@@ -72,17 +81,24 @@ final class GetOperationalMetricsAction
      * @param  Collection<int,TechnicalMemoryGenerationMetric>  $metrics
      * @return array<int,array<string,int|float|string>>
      */
-    private function buildDailyTrend(Collection $metrics): array
+    private function buildDailyTrend(Collection $metrics, Collection $costEntries): array
     {
+        $generationCostEntries = $this->generationCostEntries($costEntries);
+
         return $metrics
             ->groupBy(fn (TechnicalMemoryGenerationMetric $metric): string => $metric->created_at->toDateString())
-            ->map(function (Collection $dayMetrics, string $date): array {
+            ->map(function (Collection $dayMetrics, string $date) use ($generationCostEntries): array {
                 $attempts = $dayMetrics->count();
                 $firstPass = $dayMetrics->where('status', 'completed')->where('attempt', 1)->count();
                 $retries = $dayMetrics->filter(fn (TechnicalMemoryGenerationMetric $metric): bool => $metric->attempt > 1)->count();
                 $failures = $dayMetrics->where('status', 'failed')->count();
-                $dynamicSectionCostUsd = $this->sumAgentCost($dayMetrics, 'dynamic_section');
-                $styleEditorCostUsd = $this->sumAgentCost($dayMetrics, 'style_editor');
+                $dayCostEntries = $generationCostEntries->filter(
+                    fn (AiCostEntry $entry): bool => $entry->created_at->toDateString() === $date,
+                );
+
+                $dynamicSectionCostUsd = $this->sumCostByCategory($dayCostEntries, AiCostCategory::DynamicSection);
+                $styleEditorCostUsd = $this->sumCostByCategory($dayCostEntries, AiCostCategory::StyleEditor);
+                $estimatedCostUsd = round((float) $dayCostEntries->sum('estimated_cost_usd'), 6);
 
                 return [
                     'date' => $date,
@@ -90,7 +106,7 @@ final class GetOperationalMetricsAction
                     'first_pass_rate' => $this->rate($firstPass, $attempts),
                     'retry_rate' => $this->rate($retries, $attempts),
                     'failure_rate' => $this->rate($failures, $attempts),
-                    'estimated_cost_usd' => round((float) $dayMetrics->sum('estimated_cost_usd'), 6),
+                    'estimated_cost_usd' => $estimatedCostUsd,
                     'estimated_dynamic_cost_usd' => $dynamicSectionCostUsd,
                     'estimated_style_editor_cost_usd' => $styleEditorCostUsd,
                 ];
@@ -104,14 +120,21 @@ final class GetOperationalMetricsAction
      * @param  Collection<int,TechnicalMemoryGenerationMetric>  $metrics
      * @return array<int,array<string,int|float|string>>
      */
-    private function buildMemorySummaries(Collection $metrics): array
+    private function buildMemorySummaries(Collection $metrics, Collection $costEntries): array
     {
+        $generationCostEntries = $this->generationCostEntries($costEntries);
+
         return $metrics
             ->groupBy('technical_memory_id')
-            ->map(function (Collection $memoryMetrics, int $memoryId): array {
+            ->map(function (Collection $memoryMetrics, int $memoryId) use ($generationCostEntries): array {
                 $first = $memoryMetrics->first();
-                $dynamicSectionCostUsd = $this->sumAgentCost($memoryMetrics, 'dynamic_section');
-                $styleEditorCostUsd = $this->sumAgentCost($memoryMetrics, 'style_editor');
+                $memoryCostEntries = $generationCostEntries
+                    ->where('technical_memory_id', $memoryId)
+                    ->values();
+
+                $dynamicSectionCostUsd = $this->sumCostByCategory($memoryCostEntries, AiCostCategory::DynamicSection);
+                $styleEditorCostUsd = $this->sumCostByCategory($memoryCostEntries, AiCostCategory::StyleEditor);
+                $estimatedCostUsd = round((float) $memoryCostEntries->sum('estimated_cost_usd'), 6);
 
                 return [
                     'technical_memory_id' => $memoryId,
@@ -120,7 +143,7 @@ final class GetOperationalMetricsAction
                     'completed' => $memoryMetrics->where('status', 'completed')->count(),
                     'failed' => $memoryMetrics->where('status', 'failed')->count(),
                     'retried' => $memoryMetrics->filter(fn (TechnicalMemoryGenerationMetric $metric): bool => $metric->attempt > 1)->count(),
-                    'estimated_cost_usd' => round((float) $memoryMetrics->sum('estimated_cost_usd'), 6),
+                    'estimated_cost_usd' => $estimatedCostUsd,
                     'estimated_dynamic_cost_usd' => $dynamicSectionCostUsd,
                     'estimated_style_editor_cost_usd' => $styleEditorCostUsd,
                 ];
@@ -192,54 +215,56 @@ final class GetOperationalMetricsAction
      * @param  Collection<int,Document>  $documents
      * @return array<string,int|float>
      */
-    private function buildDocumentAnalysisSummary(Collection $documents): array
+    private function buildDocumentAnalysisSummary(Collection $documents, Collection $costEntries): array
     {
+        $documentCostEntries = $this->documentCostEntries($costEntries);
+        $documentAnalysisCostUsd = round((float) $documentCostEntries->sum('estimated_cost_usd'), 6);
+        $documentAnalyzerCostUsd = $this->sumCostByCategory($documentCostEntries, AiCostCategory::DocumentAnalyzer);
+        $dedicatedExtractorCostUsd = $this->sumCostByCategory($documentCostEntries, AiCostCategory::DedicatedJudgmentExtractor);
+
         return [
             'documents' => $documents->count(),
-            'estimated_cost_usd' => round((float) $documents->sum('estimated_analysis_cost_usd'), 6),
-            'estimated_document_analyzer_cost_usd' => $this->sumDocumentAgentCost($documents, 'document_analyzer'),
-            'estimated_dedicated_extractor_cost_usd' => $this->sumDocumentAgentCost($documents, 'dedicated_judgment_extractor'),
+            'estimated_cost_usd' => $documentAnalysisCostUsd,
+            'estimated_document_analyzer_cost_usd' => $documentAnalyzerCostUsd,
+            'estimated_dedicated_extractor_cost_usd' => $dedicatedExtractorCostUsd,
         ];
     }
 
     /**
-     * @param  Collection<int,TechnicalMemoryGenerationMetric>  $metrics
+     * @param  Collection<int,AiCostEntry>  $costEntries
+     * @return Collection<int,AiCostEntry>
      */
-    private function sumAgentCost(Collection $metrics, string $agentKey): float
+    private function generationCostEntries(Collection $costEntries): Collection
     {
-        return $this->sumBreakdownAgentCost(
-            items: $metrics,
-            breakdownResolver: fn (TechnicalMemoryGenerationMetric $metric): mixed => $metric->agent_cost_breakdown,
-            agentKey: $agentKey,
-        );
+        return $costEntries
+            ->filter(fn (AiCostEntry $entry): bool => in_array($entry->category, [
+                AiCostCategory::DynamicSection,
+                AiCostCategory::StyleEditor,
+            ], true))
+            ->values();
     }
 
     /**
-     * @param  Collection<int,Document>  $documents
+     * @param  Collection<int,AiCostEntry>  $costEntries
+     * @return Collection<int,AiCostEntry>
      */
-    private function sumDocumentAgentCost(Collection $documents, string $agentKey): float
+    private function documentCostEntries(Collection $costEntries): Collection
     {
-        return $this->sumBreakdownAgentCost(
-            items: $documents,
-            breakdownResolver: fn (Document $document): mixed => $document->analysis_cost_breakdown,
-            agentKey: $agentKey,
-        );
+        return $costEntries
+            ->filter(fn (AiCostEntry $entry): bool => in_array($entry->category, [
+                AiCostCategory::DocumentAnalyzer,
+                AiCostCategory::DedicatedJudgmentExtractor,
+            ], true))
+            ->values();
     }
 
     /**
-     * @param  Collection<int,mixed>  $items
-     * @param  Closure(mixed):mixed  $breakdownResolver
+     * @param  Collection<int,AiCostEntry>  $costEntries
      */
-    private function sumBreakdownAgentCost(Collection $items, Closure $breakdownResolver, string $agentKey): float
+    private function sumCostByCategory(Collection $costEntries, AiCostCategory $category): float
     {
-        return round((float) $items->sum(function (mixed $item) use ($breakdownResolver, $agentKey): float {
-            $breakdown = $breakdownResolver($item);
-
-            if (! is_array($breakdown)) {
-                return 0.0;
-            }
-
-            return (float) data_get($breakdown, $agentKey.'.estimated_cost_usd', 0.0);
-        }), 6);
+        return round((float) $costEntries
+            ->where('category', $category)
+            ->sum('estimated_cost_usd'), 6);
     }
 }

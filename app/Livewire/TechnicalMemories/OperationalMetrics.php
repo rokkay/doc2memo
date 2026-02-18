@@ -54,9 +54,16 @@ class OperationalMetrics extends Component
         $from = CarbonImmutable::parse($this->from_date)->startOfDay();
         $to = CarbonImmutable::parse($this->to_date)->endOfDay();
         $data = $getOperationalMetricsAction($from, $to);
+        $global = $data->global;
+
+        $global['estimated_total_ai_cost_usd'] = round(
+            (float) ($global['estimated_cost_usd'] ?? 0)
+            + (float) ($global['estimated_document_analysis_cost_usd'] ?? 0),
+            6,
+        );
 
         $this->metrics = [
-            'global' => $data->global,
+            'global' => $global,
             'dailyTrend' => $data->dailyTrend,
             'memories' => $data->memories,
             'topProblematicSections' => $data->topProblematicSections,

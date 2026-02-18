@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('documents', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tender_id')->constrained()->onDelete('cascade');
+            $table->foreignId('tender_id')->index();
             $table->enum('document_type', ['pca', 'ppt']);
             $table->string('original_filename');
             $table->string('stored_filename');

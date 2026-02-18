@@ -9,8 +9,10 @@ use App\Ai\Agents\TechnicalMemorySectionEditorAgent;
 use App\Data\AiAgentRunMetricsData;
 use App\Data\TechnicalMemoryGenerationContextData;
 use App\Data\TechnicalMemorySectionData;
+use App\Enums\AiCostCategory;
 use App\Enums\TechnicalMemorySectionStatus;
 use App\Listeners\RecordAiUsageFromAgentPrompted;
+use App\Models\AiCostEntry;
 use App\Models\TechnicalMemory;
 use App\Models\TechnicalMemoryGenerationMetric;
 use App\Models\TechnicalMemorySection;
@@ -491,7 +493,7 @@ class GenerateTechnicalMemorySection implements ShouldQueue
             'output_chars' => $styleEditorMetrics['output_chars'],
         ];
 
-        TechnicalMemoryGenerationMetric::query()->create([
+        $metric = TechnicalMemoryGenerationMetric::query()->create([
             'technical_memory_id' => $memory->id,
             'technical_memory_section_id' => $section->id,
             'run_id' => $runId,
@@ -502,10 +504,71 @@ class GenerateTechnicalMemorySection implements ShouldQueue
             'duration_ms' => max(0, $durationMs),
             'output_chars' => $safeOutputChars,
             'model_name' => $dynamicAgentMetrics['model_name'],
-            'estimated_input_units' => $costSummary['estimated_input_units'],
-            'estimated_output_units' => $costSummary['estimated_output_units'],
-            'estimated_cost_usd' => $costSummary['estimated_cost_usd'],
-            'agent_cost_breakdown' => $agentCostBreakdown,
         ]);
+
+        $this->storeAiCostEntries(
+            memory: $memory,
+            section: $section,
+            metric: $metric,
+            runId: $runId,
+            attempt: $attempt,
+            breakdown: $agentCostBreakdown,
+        );
+    }
+
+    /**
+     * @param  array<string,mixed>  $breakdown
+     */
+    private function storeAiCostEntries(
+        TechnicalMemory $memory,
+        TechnicalMemorySection $section,
+        TechnicalMemoryGenerationMetric $metric,
+        string $runId,
+        int $attempt,
+        array $breakdown,
+    ): void {
+        $categoryByAgent = [
+            'dynamic_section' => AiCostCategory::DynamicSection,
+            'style_editor' => AiCostCategory::StyleEditor,
+        ];
+
+        foreach ($categoryByAgent as $agentKey => $category) {
+            $agentBreakdown = $breakdown[$agentKey] ?? null;
+
+            if (! is_array($agentBreakdown)) {
+                continue;
+            }
+
+            $tokenUsage = is_array($agentBreakdown['token_usage'] ?? null)
+                ? $agentBreakdown['token_usage']
+                : [];
+
+            AiCostEntry::query()->create([
+                'tender_id' => $memory->tender_id,
+                'technical_memory_id' => $memory->id,
+                'technical_memory_section_id' => $section->id,
+                'technical_memory_generation_metric_id' => $metric->id,
+                'run_id' => $runId,
+                'attempt' => $attempt,
+                'category' => $category,
+                'agent_key' => $agentKey,
+                'model_name' => $agentBreakdown['model_name'] ?? null,
+                'status' => (string) ($agentBreakdown['status'] ?? 'unknown'),
+                'input_chars' => max(0, (int) ($agentBreakdown['input_chars'] ?? 0)),
+                'output_chars' => max(0, (int) ($agentBreakdown['output_chars'] ?? 0)),
+                'prompt_tokens' => max(0, (int) ($tokenUsage['prompt_tokens'] ?? 0)),
+                'completion_tokens' => max(0, (int) ($tokenUsage['completion_tokens'] ?? 0)),
+                'cache_write_input_tokens' => max(0, (int) ($tokenUsage['cache_write_input_tokens'] ?? 0)),
+                'cache_read_input_tokens' => max(0, (int) ($tokenUsage['cache_read_input_tokens'] ?? 0)),
+                'reasoning_tokens' => max(0, (int) ($tokenUsage['reasoning_tokens'] ?? 0)),
+                'estimated_input_units' => (float) ($agentBreakdown['estimated_input_units'] ?? 0),
+                'estimated_output_units' => (float) ($agentBreakdown['estimated_output_units'] ?? 0),
+                'estimated_cost_usd' => (float) ($agentBreakdown['estimated_cost_usd'] ?? 0),
+                'metadata' => [
+                    'char_estimate_fallback' => $agentBreakdown['char_estimate_fallback'] ?? null,
+                    'token_usage_available' => (bool) ($tokenUsage['available'] ?? false),
+                ],
+            ]);
+        }
     }
 }

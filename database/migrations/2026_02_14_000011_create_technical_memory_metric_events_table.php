@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('technical_memory_metric_events', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('technical_memory_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('technical_memory_section_id')->nullable()->constrained()->cascadeOnDelete();
+            $table->foreignId('technical_memory_section_id')->nullable();
             $table->string('run_id');
             $table->unsignedInteger('attempt');
             $table->string('event_type');

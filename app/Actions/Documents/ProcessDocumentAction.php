@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Actions\Documents;
 
 use App\Data\JudgmentCriterionData;
+use App\Enums\AiCostCategory;
+use App\Models\AiCostEntry;
 use App\Models\Document;
 use App\Models\DocumentInsight;
 use App\Models\ExtractedCriterion;
@@ -55,19 +57,68 @@ final class ProcessDocumentAction
 
             $insightsCount = $this->storeInsights($document, $analysis['insights'] ?? []);
 
+            $this->storeAiCostEntries(
+                document: $document,
+                breakdown: is_array($costSummary['breakdown'] ?? null) ? $costSummary['breakdown'] : [],
+            );
+
             $document->update([
                 'status' => 'analyzed',
                 'insights_count' => $insightsCount,
-                'estimated_analysis_input_units' => $costSummary['estimated_input_units'],
-                'estimated_analysis_output_units' => $costSummary['estimated_output_units'],
-                'estimated_analysis_cost_usd' => $costSummary['estimated_cost_usd'],
-                'analysis_cost_breakdown' => $costSummary['breakdown'],
                 'processing_error' => null,
                 'analyzed_at' => now(),
             ]);
 
             $this->refreshTenderStatus($document);
         });
+    }
+
+    /**
+     * @param  array<string,mixed>  $breakdown
+     */
+    private function storeAiCostEntries(Document $document, array $breakdown): void
+    {
+        $categoryByAgent = [
+            'document_analyzer' => AiCostCategory::DocumentAnalyzer,
+            'dedicated_judgment_extractor' => AiCostCategory::DedicatedJudgmentExtractor,
+        ];
+
+        foreach ($categoryByAgent as $agentKey => $category) {
+            $agentBreakdown = $breakdown[$agentKey] ?? null;
+
+            if (! is_array($agentBreakdown)) {
+                continue;
+            }
+
+            $tokenUsage = is_array($agentBreakdown['token_usage'] ?? null)
+                ? $agentBreakdown['token_usage']
+                : [];
+
+            AiCostEntry::query()->create([
+                'tender_id' => $document->tender_id,
+                'document_id' => $document->id,
+                'run_id' => null,
+                'attempt' => null,
+                'category' => $category,
+                'agent_key' => $agentKey,
+                'model_name' => $agentBreakdown['model_name'] ?? null,
+                'status' => (string) ($agentBreakdown['status'] ?? 'unknown'),
+                'input_chars' => max(0, (int) ($agentBreakdown['input_chars'] ?? 0)),
+                'output_chars' => max(0, (int) ($agentBreakdown['output_chars'] ?? 0)),
+                'prompt_tokens' => max(0, (int) ($tokenUsage['prompt_tokens'] ?? 0)),
+                'completion_tokens' => max(0, (int) ($tokenUsage['completion_tokens'] ?? 0)),
+                'cache_write_input_tokens' => max(0, (int) ($tokenUsage['cache_write_input_tokens'] ?? 0)),
+                'cache_read_input_tokens' => max(0, (int) ($tokenUsage['cache_read_input_tokens'] ?? 0)),
+                'reasoning_tokens' => max(0, (int) ($tokenUsage['reasoning_tokens'] ?? 0)),
+                'estimated_input_units' => (float) ($agentBreakdown['estimated_input_units'] ?? 0),
+                'estimated_output_units' => (float) ($agentBreakdown['estimated_output_units'] ?? 0),
+                'estimated_cost_usd' => (float) ($agentBreakdown['estimated_cost_usd'] ?? 0),
+                'metadata' => [
+                    'char_estimate_fallback' => $agentBreakdown['char_estimate_fallback'] ?? null,
+                    'token_usage_available' => (bool) ($tokenUsage['available'] ?? false),
+                ],
+            ]);
+        }
     }
 
     private function extractText(Document $document): string
@@ -207,7 +258,6 @@ final class ProcessDocumentAction
             );
         }
     }
-
 
     /**
      * @return array<int,JudgmentCriterionData>

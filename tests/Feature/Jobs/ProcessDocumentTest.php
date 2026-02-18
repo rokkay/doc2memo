@@ -2,8 +2,9 @@
 
 declare(strict_types=1);
 
-use App\Ai\Agents\DocumentAnalyzer;
 use App\Actions\Documents\AnalyzeDocumentWithMetricsAction;
+use App\Ai\Agents\DocumentAnalyzer;
+use App\Enums\AiCostCategory;
 use App\Jobs\ProcessDocument;
 use App\Listeners\RecordAiUsageFromAgentPrompted;
 use App\Models\Document;
@@ -68,20 +69,28 @@ it('processes a pca markdown document and stores extracted data', function (): v
     $processedDocument = $document->fresh();
 
     expect($processedDocument?->status)->toBe('analyzed')
-        ->and((float) $processedDocument?->estimated_analysis_cost_usd)->toBeGreaterThan(0.0)
-        ->and($processedDocument?->analysis_cost_breakdown)->toBeArray()
-        ->and($processedDocument?->analysis_cost_breakdown)->toHaveKeys(['document_analyzer', 'dedicated_judgment_extractor'])
-        ->and(data_get($processedDocument?->analysis_cost_breakdown, 'document_analyzer.status'))->toBe('completed')
-        ->and(data_get($processedDocument?->analysis_cost_breakdown, 'dedicated_judgment_extractor.status'))->toBe('skipped');
+        ->and($processedDocument?->analyzed_at)->not->toBeNull();
 
-    $analysisBreakdown = $processedDocument?->analysis_cost_breakdown;
-    $analysisBreakdownTotal = round(
-        (float) data_get($analysisBreakdown, 'document_analyzer.estimated_cost_usd', 0)
-        + (float) data_get($analysisBreakdown, 'dedicated_judgment_extractor.estimated_cost_usd', 0),
-        6,
-    );
+    $aiEntryCostTotal = round((float) DB::table('ai_cost_entries')
+        ->where('document_id', $document->id)
+        ->sum('estimated_cost_usd'), 6);
 
-    expect((float) $processedDocument?->estimated_analysis_cost_usd)->toBe($analysisBreakdownTotal);
+    expect($aiEntryCostTotal)->toBeGreaterThan(0.0);
+
+    assertDatabaseHas('ai_cost_entries', [
+        'document_id' => $document->id,
+        'tender_id' => $tender->id,
+        'category' => AiCostCategory::DocumentAnalyzer->value,
+        'agent_key' => 'document_analyzer',
+        'status' => 'completed',
+    ]);
+
+    assertDatabaseHas('ai_cost_entries', [
+        'document_id' => $document->id,
+        'tender_id' => $tender->id,
+        'category' => AiCostCategory::DedicatedJudgmentExtractor->value,
+        'agent_key' => 'dedicated_judgment_extractor',
+    ]);
 
     assertDatabaseHas('extracted_criteria', [
         'document_id' => $document->id,
@@ -130,17 +139,9 @@ it('stores textual deadline date extracted by ai', function (): void {
     $processedDocument = $document->fresh();
 
     expect($processedDocument?->status)->toBe('analyzed')
-        ->and($processedDocument?->analysis_cost_breakdown)->toBeArray()
-        ->and($processedDocument?->analysis_cost_breakdown)->toHaveKeys(['document_analyzer', 'dedicated_judgment_extractor']);
+        ->and($processedDocument?->analyzed_at)->not->toBeNull();
 
-    $analysisBreakdown = $processedDocument?->analysis_cost_breakdown;
-    $analysisBreakdownTotal = round(
-        (float) data_get($analysisBreakdown, 'document_analyzer.estimated_cost_usd', 0)
-        + (float) data_get($analysisBreakdown, 'dedicated_judgment_extractor.estimated_cost_usd', 0),
-        6,
-    );
-
-    expect((float) $processedDocument?->estimated_analysis_cost_usd)->toBe($analysisBreakdownTotal);
+    expect(DB::table('ai_cost_entries')->where('document_id', $document->id)->count())->toBe(2);
     expect($tender->fresh()->deadline_date)->toBe('“decimoquinto dia, contado desde el dia siguiente al de la publicacion del anuncio...”');
 });
 
@@ -316,8 +317,8 @@ it('delegates document analysis and keeps persisted analysis cost breakdown keys
     $processedDocument = $document->fresh();
 
     expect($delegate->called)->toBeTrue()
-        ->and($processedDocument?->analysis_cost_breakdown)->toBeArray()
-        ->and($processedDocument?->analysis_cost_breakdown)->toHaveKeys(['document_analyzer', 'dedicated_judgment_extractor']);
+        ->and($processedDocument?->status)->toBe('analyzed')
+        ->and(DB::table('ai_cost_entries')->where('document_id', $document->id)->count())->toBe(2);
 });
 
 it('stores analyzer token usage metadata and char fallback for document analysis', function (): void {
@@ -358,14 +359,23 @@ it('stores analyzer token usage metadata and char fallback for document analysis
 
     (new ProcessDocument($document))->handle();
 
-    $breakdown = $document->fresh()?->analysis_cost_breakdown;
+    $analyzerEntry = DB::table('ai_cost_entries')
+        ->where('document_id', $document->id)
+        ->where('agent_key', 'document_analyzer')
+        ->first();
 
-    expect(data_get($breakdown, 'document_analyzer.token_usage.available'))->toBeTrue()
-        ->and((int) data_get($breakdown, 'document_analyzer.token_usage.prompt_tokens'))->toBeGreaterThanOrEqual(0)
-        ->and((int) data_get($breakdown, 'document_analyzer.token_usage.completion_tokens'))->toBeGreaterThanOrEqual(0)
-        ->and(data_get($breakdown, 'dedicated_judgment_extractor.token_usage.available'))->toBeFalse()
-        ->and((int) data_get($breakdown, 'document_analyzer.char_estimate_fallback.input_chars'))->toBeGreaterThan(0)
-        ->and((int) data_get($breakdown, 'dedicated_judgment_extractor.char_estimate_fallback.input_chars'))->toBe(0);
+    $extractorEntry = DB::table('ai_cost_entries')
+        ->where('document_id', $document->id)
+        ->where('agent_key', 'dedicated_judgment_extractor')
+        ->first();
+
+    expect($analyzerEntry)->not->toBeNull()
+        ->and($extractorEntry)->not->toBeNull()
+        ->and((int) ($analyzerEntry?->prompt_tokens ?? 0))->toBeGreaterThanOrEqual(0)
+        ->and((int) ($analyzerEntry?->completion_tokens ?? 0))->toBeGreaterThanOrEqual(0)
+        ->and((int) ($extractorEntry?->prompt_tokens ?? 0))->toBe(0)
+        ->and((int) ($analyzerEntry?->input_chars ?? 0))->toBeGreaterThan(0)
+        ->and((int) ($extractorEntry?->input_chars ?? 0))->toBe(0);
 
     RecordAiUsageFromAgentPrompted::flush();
 });

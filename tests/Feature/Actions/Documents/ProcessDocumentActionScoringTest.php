@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Actions\Documents\ProcessDocumentAction;
 use App\Ai\Agents\DocumentAnalyzer;
 use App\Ai\Agents\PcaJudgmentCriteriaExtractorAgent;
+use App\Enums\AiCostCategory;
 use App\Models\Document;
 use App\Models\Tender;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -58,9 +59,19 @@ it('stores criterion type, score points, and group key from analyzer payload', f
 
     $processedDocument = $document->fresh();
 
-    expect($processedDocument?->analysis_cost_breakdown)
-        ->toBeArray()
-        ->toHaveKeys(['document_analyzer', 'dedicated_judgment_extractor']);
+    assertDatabaseHas('ai_cost_entries', [
+        'document_id' => $document->id,
+        'category' => AiCostCategory::DocumentAnalyzer->value,
+        'agent_key' => 'document_analyzer',
+        'status' => 'completed',
+    ]);
+
+    assertDatabaseHas('ai_cost_entries', [
+        'document_id' => $document->id,
+        'category' => AiCostCategory::DedicatedJudgmentExtractor->value,
+        'agent_key' => 'dedicated_judgment_extractor',
+        'status' => 'skipped',
+    ]);
 
     assertDatabaseHas('extracted_criteria', [
         'document_id' => $document->id,
@@ -158,10 +169,21 @@ it('uses dedicated judgment criteria agent to extract over-b scoring table', fun
     $processedDocument = $document->fresh();
 
     expect($processedDocument)->not->toBeNull()
-        ->and((float) $processedDocument?->estimated_analysis_cost_usd)->toBeGreaterThan(0.0)
-        ->and(data_get($processedDocument?->analysis_cost_breakdown, 'document_analyzer.status'))->toBe('completed')
-        ->and(data_get($processedDocument?->analysis_cost_breakdown, 'dedicated_judgment_extractor.status'))->toBe('completed')
-        ->and((float) data_get($processedDocument?->analysis_cost_breakdown, 'dedicated_judgment_extractor.estimated_cost_usd'))->toBeGreaterThan(0.0);
+        ->and($processedDocument?->status)->toBe('analyzed');
+
+    assertDatabaseHas('ai_cost_entries', [
+        'document_id' => $document->id,
+        'category' => AiCostCategory::DocumentAnalyzer->value,
+        'agent_key' => 'document_analyzer',
+        'status' => 'completed',
+    ]);
+
+    assertDatabaseHas('ai_cost_entries', [
+        'document_id' => $document->id,
+        'category' => AiCostCategory::DedicatedJudgmentExtractor->value,
+        'agent_key' => 'dedicated_judgment_extractor',
+        'status' => 'completed',
+    ]);
 
     $judgmentCount = \App\Models\ExtractedCriterion::query()
         ->where('document_id', $document->id)
