@@ -16,8 +16,8 @@ final class UpsertMetricRunSummaryAction
         string $runId,
         ?string $trigger = null,
         ?int $sectionsTotal = null,
-    ): TechnicalMemoryMetricRun
-    {
+        ?string $batchId = null,
+    ): TechnicalMemoryMetricRun {
         $existingRun = TechnicalMemoryMetricRun::query()
             ->where('technical_memory_id', $memory->id)
             ->where('run_id', $runId)
@@ -39,14 +39,26 @@ final class UpsertMetricRunSummaryAction
                 'sections_failed' => 0,
                 'sections_retried' => 0,
                 'duration_ms' => null,
+                'batch_id' => $batchId,
             ],
         );
 
-        if ($run->trigger !== $resolvedTrigger || $run->sections_total !== $resolvedSectionsTotal) {
-            $run->fill([
-                'trigger' => $resolvedTrigger,
-                'sections_total' => $resolvedSectionsTotal,
-            ])->save();
+        $attributes = [];
+
+        if ($run->trigger !== $resolvedTrigger) {
+            $attributes['trigger'] = $resolvedTrigger;
+        }
+
+        if ($run->sections_total !== $resolvedSectionsTotal) {
+            $attributes['sections_total'] = $resolvedSectionsTotal;
+        }
+
+        if ($batchId !== null && $run->batch_id !== $batchId) {
+            $attributes['batch_id'] = $batchId;
+        }
+
+        if ($attributes !== []) {
+            $run->fill($attributes)->save();
         }
 
         $events = TechnicalMemoryMetricEvent::query()

@@ -11,10 +11,13 @@ use App\Data\TechnicalMemorySectionData;
 use App\Enums\TechnicalMemorySectionStatus;
 use App\Jobs\GenerateTechnicalMemorySection;
 use App\Models\ExtractedCriterion;
+use App\Models\TechnicalMemory;
 use App\Models\TechnicalMemorySection;
 use App\Models\Tender;
 use App\Support\JudgmentCriteriaParser;
+use Illuminate\Bus\Batch;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Str;
 
 final class GenerateTechnicalMemoryAction
@@ -118,7 +121,7 @@ final class GenerateTechnicalMemoryAction
             return;
         }
 
-        resolve(UpsertMetricRunSummaryAction::class)(
+        $runSummary = resolve(UpsertMetricRunSummaryAction::class)(
             memory: $memory,
             runId: (string) $generationContext->runId,
             trigger: 'full_generation',
@@ -126,6 +129,8 @@ final class GenerateTechnicalMemoryAction
         );
 
         $totalPoints = (float) $sectionGroups->sum(fn (TechnicalMemorySectionData $group): float => $group->totalPoints);
+
+        $jobs = [];
 
         foreach ($sectionGroups->values() as $index => $group) {
             /** @var TechnicalMemorySectionData $group */
@@ -145,13 +150,50 @@ final class GenerateTechnicalMemoryAction
                 'status' => TechnicalMemorySectionStatus::Pending,
             ]);
 
-            GenerateTechnicalMemorySection::dispatch(
+            $jobs[] = new GenerateTechnicalMemorySection(
                 technicalMemorySectionId: $section->id,
                 section: $group,
                 context: $generationContext,
                 runId: (string) $generationContext->runId,
             );
         }
+
+        $memoryId = (int) $memory->id;
+        $runId = (string) $generationContext->runId;
+
+        $batch = Bus::batch($jobs)
+            ->onConnection((string) config('queue.default', 'redis'))
+            ->onQueue((string) config('queue.connections.redis.queue', 'default'))
+            ->name(sprintf('technical-memory:tender-%d:run-%s', $tender->id, $runId))
+            ->allowFailures()
+            ->finally(function (Batch $_batch) use ($memoryId, $runId): void {
+                $memory = TechnicalMemory::query()->find($memoryId);
+
+                if (! $memory) {
+                    return;
+                }
+
+                resolve(UpsertMetricRunSummaryAction::class)(
+                    memory: $memory,
+                    runId: $runId,
+                );
+
+                $hasBlockingSections = $memory->sections()
+                    ->whereIn('status', TechnicalMemorySectionStatus::blockingValues())
+                    ->exists();
+
+                if (! $hasBlockingSections && $memory->status === 'draft') {
+                    $memory->update([
+                        'status' => 'generated',
+                        'generated_at' => now(),
+                    ]);
+                }
+            })
+            ->dispatch();
+
+        $runSummary->update([
+            'batch_id' => $batch->id,
+        ]);
     }
 
     /**

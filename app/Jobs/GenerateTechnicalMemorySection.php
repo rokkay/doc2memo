@@ -19,6 +19,7 @@ use App\Models\TechnicalMemorySection;
 use App\Support\AiCostBreakdownCalculator;
 use App\Support\TechnicalMemoryMetrics;
 use App\Support\TechnicalMemorySectionQualityGate;
+use Illuminate\Bus\Batchable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -27,7 +28,7 @@ use Throwable;
 
 class GenerateTechnicalMemorySection implements ShouldQueue
 {
-    use Queueable;
+    use Batchable, Queueable;
 
     public function __construct(
         public int $technicalMemorySectionId,
@@ -39,6 +40,10 @@ class GenerateTechnicalMemorySection implements ShouldQueue
 
     public function handle(): void
     {
+        if ($this->batch()?->cancelled()) {
+            return;
+        }
+
         $startedAt = microtime(true);
 
         $section = TechnicalMemorySection::query()
@@ -201,13 +206,25 @@ class GenerateTechnicalMemorySection implements ShouldQueue
                         'error_message' => $qualityFeedback,
                     ]);
 
-                    self::dispatch(
+                    $retryJob = new self(
                         technicalMemorySectionId: $this->technicalMemorySectionId,
                         section: $this->section,
                         context: $context->withQualityFeedback($qualityFeedback),
                         qualityAttempt: $this->qualityAttempt + 1,
                         runId: $resolvedRunId,
                     );
+
+                    if ($this->batch() !== null) {
+                        $this->batch()->add([$retryJob]);
+                    } else {
+                        self::dispatch(
+                            technicalMemorySectionId: $this->technicalMemorySectionId,
+                            section: $this->section,
+                            context: $context->withQualityFeedback($qualityFeedback),
+                            qualityAttempt: $this->qualityAttempt + 1,
+                            runId: $resolvedRunId,
+                        );
+                    }
 
                     $recordMetricEvent(
                         memory: $memory,

@@ -3,9 +3,9 @@
 namespace App\Livewire\Tenders;
 
 use App\Enums\TechnicalMemorySectionStatus;
-use App\Jobs\GenerateTechnicalMemory;
 use App\Models\Tender;
 use App\Services\DocumentAnalysisService;
+use App\Services\TechnicalMemoryGenerationService;
 use Illuminate\Support\Collection;
 use Illuminate\View\View;
 use Livewire\Attributes\Computed;
@@ -16,6 +16,8 @@ class TenderDetail extends Component
     public Tender $tender;
 
     protected DocumentAnalysisService $documentAnalysisService;
+
+    protected TechnicalMemoryGenerationService $technicalMemoryGenerationService;
 
     public bool $isAnalyzing = false;
 
@@ -32,8 +34,10 @@ class TenderDetail extends Component
 
     public function boot(
         DocumentAnalysisService $documentAnalysisService,
+        TechnicalMemoryGenerationService $technicalMemoryGenerationService,
     ): void {
         $this->documentAnalysisService = $documentAnalysisService;
+        $this->technicalMemoryGenerationService = $technicalMemoryGenerationService;
     }
 
     #[Computed]
@@ -200,7 +204,7 @@ class TenderDetail extends Component
                 ]
             );
 
-            GenerateTechnicalMemory::dispatch($this->tender);
+            $this->technicalMemoryGenerationService->generate($this->tender);
 
             $this->loadTenderRelations();
 

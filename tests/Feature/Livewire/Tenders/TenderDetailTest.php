@@ -1,6 +1,6 @@
 <?php
 
-use App\Jobs\GenerateTechnicalMemory;
+use App\Jobs\GenerateTechnicalMemorySection;
 use App\Livewire\Tenders\TenderDetail;
 use App\Models\Document;
 use App\Models\ExtractedCriterion;
@@ -9,7 +9,9 @@ use App\Models\TechnicalMemory;
 use App\Models\TechnicalMemorySection;
 use App\Models\Tender;
 use App\Services\DocumentAnalysisService;
+use Illuminate\Bus\PendingBatch;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 
@@ -110,9 +112,34 @@ it('displays technical memory when available', function (): void {
 });
 
 it('can regenerate existing technical memory and reset sections', function (): void {
-    Queue::fake();
+    Bus::fake();
 
     $tender = Tender::factory()->create(['status' => 'completed']);
+    $pcaDocument = Document::factory()->create([
+        'tender_id' => $tender->id,
+        'document_type' => 'pca',
+    ]);
+    $pptDocument = Document::factory()->create([
+        'tender_id' => $tender->id,
+        'document_type' => 'ppt',
+    ]);
+
+    ExtractedCriterion::factory()->create([
+        'tender_id' => $tender->id,
+        'document_id' => $pcaDocument->id,
+        'criterion_type' => 'judgment',
+        'source' => 'dedicated_extractor',
+        'section_number' => '1.1',
+        'section_title' => 'Metodología',
+        'group_key' => '1.1-metodologia',
+        'score_points' => 10,
+    ]);
+
+    ExtractedSpecification::factory()->create([
+        'tender_id' => $tender->id,
+        'document_id' => $pptDocument->id,
+    ]);
+
     $memory = TechnicalMemory::factory()->create([
         'tender_id' => $tender->id,
         'status' => 'generated',
@@ -124,8 +151,9 @@ it('can regenerate existing technical memory and reset sections', function (): v
         ->call('generateMemory')
         ->assertDispatched('memory-generated');
 
-    Queue::assertPushed(GenerateTechnicalMemory::class, function (GenerateTechnicalMemory $job) use ($tender): bool {
-        return $job->tender->is($tender);
+    Bus::assertBatched(function (PendingBatch $batch): bool {
+        return $batch->jobs->count() === 1
+            && $batch->jobs->first() instanceof GenerateTechnicalMemorySection;
     });
 
     $memory = $memory->fresh();
@@ -211,7 +239,32 @@ it('renders styled document action buttons for download and retry', function ():
 
 it('queues technical memory generation when analysis is complete', function (): void {
     $tender = Tender::factory()->create(['status' => 'completed']);
-    Queue::fake();
+    $pcaDocument = Document::factory()->create([
+        'tender_id' => $tender->id,
+        'document_type' => 'pca',
+    ]);
+    $pptDocument = Document::factory()->create([
+        'tender_id' => $tender->id,
+        'document_type' => 'ppt',
+    ]);
+
+    ExtractedCriterion::factory()->create([
+        'tender_id' => $tender->id,
+        'document_id' => $pcaDocument->id,
+        'criterion_type' => 'judgment',
+        'source' => 'dedicated_extractor',
+        'section_number' => '1.1',
+        'section_title' => 'Metodología',
+        'group_key' => '1.1-metodologia',
+        'score_points' => 10,
+    ]);
+
+    ExtractedSpecification::factory()->create([
+        'tender_id' => $tender->id,
+        'document_id' => $pptDocument->id,
+    ]);
+
+    Bus::fake();
 
     Livewire::test(TenderDetail::class, ['tender' => $tender])
         ->call('generateMemory')
@@ -219,8 +272,9 @@ it('queues technical memory generation when analysis is complete', function (): 
         ->assertSee('Ver progreso de la memoria')
         ->assertSee(route('technical-memories.show', $tender));
 
-    Queue::assertPushed(GenerateTechnicalMemory::class, function (GenerateTechnicalMemory $job) use ($tender): bool {
-        return $job->tender->is($tender);
+    Bus::assertBatched(function (PendingBatch $batch): bool {
+        return $batch->jobs->count() === 1
+            && $batch->jobs->first() instanceof GenerateTechnicalMemorySection;
     });
 
     expect($tender->fresh()->technicalMemory)->not->toBeNull();

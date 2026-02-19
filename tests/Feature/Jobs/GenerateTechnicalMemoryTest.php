@@ -2,16 +2,17 @@
 
 declare(strict_types=1);
 
+use App\Actions\Tenders\GenerateTechnicalMemoryAction;
 use App\Data\TechnicalMemoryGenerationContextData;
 use App\Data\TechnicalMemorySectionData;
-use App\Jobs\GenerateTechnicalMemory;
 use App\Jobs\GenerateTechnicalMemorySection;
 use App\Models\Document;
 use App\Models\ExtractedCriterion;
 use App\Models\ExtractedSpecification;
 use App\Models\Tender;
+use Illuminate\Bus\PendingBatch;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Bus;
 
 use function Pest\Laravel\assertDatabaseHas;
 use function Pest\Laravel\assertDatabaseMissing;
@@ -19,7 +20,7 @@ use function Pest\Laravel\assertDatabaseMissing;
 uses(RefreshDatabase::class);
 
 it('creates dynamic draft memory and dispatches one job per judgment section', function (): void {
-    Queue::fake();
+    Bus::fake();
 
     $tender = Tender::factory()->completed()->create([
         'title' => 'Servicio de desarrollo y mantenimiento',
@@ -95,7 +96,7 @@ it('creates dynamic draft memory and dispatches one job per judgment section', f
         'requirements' => 'Cumplir WCAG 2.1 AA',
     ]);
 
-    (new GenerateTechnicalMemory($tender))->handle();
+    resolve(GenerateTechnicalMemoryAction::class)($tender);
 
     assertDatabaseHas('technical_memories', [
         'tender_id' => $tender->id,
@@ -118,15 +119,19 @@ it('creates dynamic draft memory and dispatches one job per judgment section', f
         'sort_order' => 1,
     ]);
 
-    Queue::assertPushedTimes(GenerateTechnicalMemorySection::class, 2);
+    Bus::assertBatchCount(1);
 
-    Queue::assertPushed(GenerateTechnicalMemorySection::class, function (GenerateTechnicalMemorySection $job): bool {
-        return $job->section instanceof TechnicalMemorySectionData
-            && $job->context instanceof TechnicalMemoryGenerationContextData
-            && $job->section->sectionTitle === 'Criterios adjudicación (B) Juicio de valor - Metodología'
-            && $job->section->totalPoints === 40.0
-            && count($job->section->criteria) === 2
-            && data_get($job->context->pca, 'criteria.0.criterion_type') === 'judgment';
+    Bus::assertBatched(function (PendingBatch $batch): bool {
+        $matchingJob = $batch->jobs
+            ->filter(fn ($job): bool => $job instanceof GenerateTechnicalMemorySection)
+            ->first(fn (GenerateTechnicalMemorySection $job): bool => $job->section instanceof TechnicalMemorySectionData
+                && $job->context instanceof TechnicalMemoryGenerationContextData
+                && $job->section->sectionTitle === 'Criterios adjudicación (B) Juicio de valor - Metodología'
+                && $job->section->totalPoints === 40.0
+                && count($job->section->criteria) === 2
+                && data_get($job->context->pca, 'criteria.0.criterion_type') === 'judgment');
+
+        return $batch->jobs->count() === 2 && $matchingJob !== null;
     });
 
     $firstSection = $tender->fresh()->technicalMemory?->sections()->orderBy('sort_order')->first();
@@ -137,7 +142,7 @@ it('creates dynamic draft memory and dispatches one job per judgment section', f
 });
 
 it('splits a grouped judgment criterion into multiple dynamic sections', function (): void {
-    Queue::fake();
+    Bus::fake();
 
     $tender = Tender::factory()->completed()->create();
 
@@ -158,7 +163,7 @@ it('splits a grouped judgment criterion into multiple dynamic sections', functio
         'source' => 'analyzer',
     ]);
 
-    (new GenerateTechnicalMemory($tender))->handle();
+    resolve(GenerateTechnicalMemoryAction::class)($tender);
 
     expect($tender->fresh()->technicalMemory?->sections()->count())->toBe(6);
 
@@ -174,11 +179,11 @@ it('splits a grouped judgment criterion into multiple dynamic sections', functio
         'total_points' => 8.00,
     ]);
 
-    Queue::assertPushedTimes(GenerateTechnicalMemorySection::class, 6);
+    Bus::assertBatched(fn (PendingBatch $batch): bool => $batch->jobs->count() === 6);
 });
 
 it('uses only dedicated extractor criteria when available', function (): void {
-    Queue::fake();
+    Bus::fake();
 
     $tender = Tender::factory()->completed()->create();
 
@@ -231,7 +236,7 @@ it('uses only dedicated extractor criteria when available', function (): void {
         'source' => 'dedicated_extractor',
     ]);
 
-    (new GenerateTechnicalMemory($tender))->handle();
+    resolve(GenerateTechnicalMemoryAction::class)($tender);
 
     $memory = $tender->fresh()->technicalMemory;
 
@@ -261,11 +266,11 @@ it('uses only dedicated extractor criteria when available', function (): void {
         'section_number' => 'Cuadro criterios adjudicación A/B',
     ]);
 
-    Queue::assertPushedTimes(GenerateTechnicalMemorySection::class, 2);
+    Bus::assertBatched(fn (PendingBatch $batch): bool => $batch->jobs->count() === 2);
 });
 
 it('propagates one run id to every section generation job in a full generation', function (): void {
-    Queue::fake();
+    Bus::fake();
 
     $tender = Tender::factory()->completed()->create();
 
@@ -296,19 +301,23 @@ it('propagates one run id to every section generation job in a full generation',
         'source' => 'dedicated_extractor',
     ]);
 
-    (new GenerateTechnicalMemory($tender))->handle();
+    resolve(GenerateTechnicalMemoryAction::class)($tender);
 
-    $jobs = Queue::pushed(GenerateTechnicalMemorySection::class);
+    Bus::assertBatched(function (PendingBatch $batch): bool {
+        $jobs = $batch->jobs
+            ->filter(fn ($job): bool => $job instanceof GenerateTechnicalMemorySection)
+            ->values();
 
-    $runIds = $jobs
-        ->map(fn (GenerateTechnicalMemorySection $queuedJob): ?string => $queuedJob->runId)
-        ->filter(fn (?string $runId): bool => is_string($runId) && $runId !== '')
-        ->unique()
-        ->values();
+        $runIds = $jobs
+            ->map(fn (GenerateTechnicalMemorySection $queuedJob): ?string => $queuedJob->runId)
+            ->filter(fn (?string $runId): bool => is_string($runId) && $runId !== '')
+            ->unique()
+            ->values();
 
-    expect($jobs)->toHaveCount(2)
-        ->and($runIds)->toHaveCount(1)
-        ->and($runIds->first())->not->toBe('')
-        ->and($jobs->first()->runId)->toBe($jobs->last()->runId)
-        ->and($jobs->first()->context->runId)->toBe($jobs->first()->runId);
+        return $jobs->count() === 2
+            && $runIds->count() === 1
+            && $runIds->first() !== ''
+            && $jobs->first()?->runId === $jobs->last()?->runId
+            && $jobs->first()?->context->runId === $jobs->first()?->runId;
+    });
 });

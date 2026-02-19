@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Jobs\GenerateTechnicalMemory;
 use App\Jobs\ProcessDocument;
 use App\Models\Document;
 use App\Models\Tender;
+use App\Services\TechnicalMemoryGenerationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -104,7 +104,7 @@ class TenderController extends Controller
             ->with('success', "Análisis iniciado para {$documentCount} documento(s): {$docNames}. La IA está extrayendo información. Puedes seguir el progreso en esta página.");
     }
 
-    public function generateMemory(Tender $tender): RedirectResponse
+    public function generateMemory(Tender $tender, TechnicalMemoryGenerationService $technicalMemoryGenerationService): RedirectResponse
     {
         if ($tender->extractedCriteria->isEmpty() || $tender->extractedSpecifications->isEmpty()) {
             $missing = [];
@@ -126,7 +126,7 @@ class TenderController extends Controller
                 ->with('info', 'Ya existe una memoria técnica generada para esta licitación. Puedes verla en la pestaña "Memoria Técnica".');
         }
 
-        GenerateTechnicalMemory::dispatch($tender);
+        $technicalMemoryGenerationService->generate($tender);
 
         return redirect()
             ->back()

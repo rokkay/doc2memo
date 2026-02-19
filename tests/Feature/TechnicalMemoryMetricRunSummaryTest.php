@@ -2,22 +2,23 @@
 
 declare(strict_types=1);
 
+use App\Actions\Tenders\GenerateTechnicalMemoryAction;
 use App\Ai\Agents\TechnicalMemoryDynamicSectionAgent;
 use App\Ai\Agents\TechnicalMemorySectionEditorAgent;
-use App\Jobs\GenerateTechnicalMemory;
 use App\Jobs\GenerateTechnicalMemorySection;
 use App\Models\Document;
 use App\Models\ExtractedCriterion;
 use App\Models\Tender;
+use Illuminate\Bus\PendingBatch;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Bus;
 
 use function Pest\Laravel\assertDatabaseHas;
 
 uses(RefreshDatabase::class);
 
 it('aggregates completed counters into a run summary after all sections finish', function (): void {
-    Queue::fake();
+    Bus::fake();
 
     $tender = Tender::factory()->completed()->create([
         'title' => 'Servicio de soporte integral',
@@ -67,9 +68,17 @@ it('aggregates completed counters into a run summary after all sections finish',
         ['content' => $richContent],
     ])->preventStrayPrompts();
 
-    (new GenerateTechnicalMemory($tender))->handle();
+    resolve(GenerateTechnicalMemoryAction::class)($tender);
 
-    $jobs = Queue::pushed(GenerateTechnicalMemorySection::class);
+    $jobs = collect();
+
+    Bus::assertBatched(function (PendingBatch $batch) use (&$jobs): bool {
+        $jobs = $batch->jobs
+            ->filter(fn ($job): bool => $job instanceof GenerateTechnicalMemorySection)
+            ->values();
+
+        return $jobs->count() === 2;
+    });
 
     expect($jobs)->toHaveCount(2);
 

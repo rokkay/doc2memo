@@ -13,6 +13,7 @@ class TechnicalMemoryMetricRun extends Model
     protected $fillable = [
         'technical_memory_id',
         'run_id',
+        'batch_id',
         'trigger',
         'status',
         'sections_total',
