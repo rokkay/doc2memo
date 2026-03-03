@@ -55,14 +55,27 @@ INSTRUCTIONS;
 
     public function generate(): string
     {
-        $response = $this->prompt($this->promptText());
+        $response = $this->prompt($this->buildPromptText());
 
+        return $this->extractContent($response);
+    }
+
+    public function extractContent(mixed $response): string
+    {
         $content = '';
 
         if (is_array($response)) {
             $content = (string) ($response['content'] ?? '');
         } elseif ($response instanceof \ArrayAccess) {
             $content = (string) ($response['content'] ?? '');
+        } elseif (is_object($response) && is_string($response->text ?? null)) {
+            $decoded = json_decode($response->text, true);
+
+            if (is_array($decoded) && is_string($decoded['content'] ?? null)) {
+                $content = $decoded['content'];
+            } else {
+                $content = $response->text;
+            }
         }
 
         $sanitized = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $content);
@@ -77,10 +90,10 @@ INSTRUCTIONS;
 
     public function estimateInputChars(): int
     {
-        return mb_strlen($this->promptText());
+        return mb_strlen($this->buildPromptText());
     }
 
-    private function promptText(): string
+    public function buildPromptText(): string
     {
         $sectionPayload = json_encode($this->section, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
         $contextPayload = json_encode($this->context, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
