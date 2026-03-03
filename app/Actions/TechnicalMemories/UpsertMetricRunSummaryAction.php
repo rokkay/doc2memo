@@ -8,6 +8,7 @@ use App\Models\TechnicalMemory;
 use App\Models\TechnicalMemoryMetricEvent;
 use App\Models\TechnicalMemoryMetricRun;
 use App\Support\TechnicalMemoryMetrics;
+use Illuminate\Support\Collection;
 
 final class UpsertMetricRunSummaryAction
 {
@@ -73,7 +74,7 @@ final class UpsertMetricRunSummaryAction
         $terminalEventsBySection = $events
             ->filter(fn (TechnicalMemoryMetricEvent $event): bool => $event->technical_memory_section_id !== null)
             ->groupBy('technical_memory_section_id')
-            ->map(fn ($sectionEvents) => $sectionEvents
+            ->map(fn (Collection $sectionEvents): ?TechnicalMemoryMetricEvent => $sectionEvents
                 ->whereIn('event_type', [TechnicalMemoryMetrics::EVENT_COMPLETED, TechnicalMemoryMetrics::EVENT_FAILED])
                 ->last())
             ->filter();

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\TechnicalMemory;
+use App\Models\TechnicalMemorySection;
 use App\Models\Tender;
 use App\Support\SectionTitleNormalizer;
 use App\Support\TechnicalMemoryMarkdownBuilder;
@@ -27,7 +28,7 @@ class TechnicalMemoryController extends Controller
         $technicalMemory->loadMissing('sections');
 
         $rawSections = $technicalMemory->sections
-            ->map(function ($section): ?array {
+            ->map(function (TechnicalMemorySection $section): ?array {
                 $content = trim((string) ($section->content ?? ''));
 
                 if ($content === '') {

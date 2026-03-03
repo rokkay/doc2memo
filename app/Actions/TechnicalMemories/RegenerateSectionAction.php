@@ -9,6 +9,9 @@ use App\Data\TechnicalMemoryGenerationContextData;
 use App\Data\TechnicalMemorySectionData;
 use App\Enums\TechnicalMemorySectionStatus;
 use App\Jobs\GenerateTechnicalMemorySection;
+use App\Models\DocumentInsight;
+use App\Models\ExtractedCriterion;
+use App\Models\ExtractedSpecification;
 use App\Models\TechnicalMemory;
 use App\Models\TechnicalMemorySection;
 use App\Models\Tender;
@@ -35,7 +38,7 @@ final class RegenerateSectionAction
             ->values();
 
         $criteriaData = $sectionCriteria
-            ->map(fn ($criterion): JudgmentCriterionData => JudgmentCriterionData::fromModel($criterion))
+            ->map(fn (ExtractedCriterion $criterion): JudgmentCriterionData => JudgmentCriterionData::fromModel($criterion))
             ->all();
 
         $sectionData = new TechnicalMemorySectionData(
@@ -93,7 +96,7 @@ final class RegenerateSectionAction
     private function buildPcaCriteriaPayload(Collection $criteria): array
     {
         return $criteria
-            ->map(fn ($criterion): array => JudgmentCriterionData::fromModel($criterion)->toArray())
+            ->map(fn (ExtractedCriterion $criterion): array => JudgmentCriterionData::fromModel($criterion)->toArray())
             ->all();
     }
 
@@ -131,7 +134,7 @@ final class RegenerateSectionAction
             ->orderByDesc('importance')
             ->orderBy('id')
             ->get()
-            ->map(fn ($item) => [
+            ->map(fn (DocumentInsight $item): array => [
                 'section_reference' => $item->section_reference,
                 'topic' => $item->topic,
                 'requirement_type' => $item->requirement_type,
@@ -150,7 +153,7 @@ final class RegenerateSectionAction
         return $tender->extractedSpecifications
             ->sortBy('id')
             ->values()
-            ->map(fn ($item): array => [
+            ->map(fn (ExtractedSpecification $item): array => [
                 'section_number' => $item->section_number,
                 'section_title' => $item->section_title,
                 'technical_description' => $item->technical_description,

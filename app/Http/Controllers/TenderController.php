@@ -8,6 +8,7 @@ use App\Models\Tender;
 use App\Services\TechnicalMemoryGenerationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\View\View;
 
 class TenderController extends Controller
@@ -133,7 +134,7 @@ class TenderController extends Controller
             ->with('success', '¡Generación de la Memoria Técnica iniciada! La IA está creando el documento basándose en '.$tender->extractedCriteria->count().' criterios del PCA y '.$tender->extractedSpecifications->count().' especificaciones del PPT. Esto puede tardar unos minutos.');
     }
 
-    private function storeDocument(Tender $tender, $file, string $documentType): Document
+    private function storeDocument(Tender $tender, UploadedFile $file, string $documentType): Document
     {
         $originalFilename = $file->getClientOriginalName();
         $storedFilename = uniqid().'_'.$originalFilename;
