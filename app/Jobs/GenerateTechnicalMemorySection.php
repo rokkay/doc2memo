@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\TechnicalMemories\QueueGenerateTechnicalMemorySectionAction;
 use App\Actions\TechnicalMemories\RecordMetricEventAction;
 use App\Actions\TechnicalMemories\UpsertMetricRunSummaryAction;
 use App\Ai\Agents\TechnicalMemoryDynamicSectionAgent;
@@ -36,6 +37,9 @@ class GenerateTechnicalMemorySection implements ShouldQueue
         public TechnicalMemoryGenerationContextData $context,
         public int $qualityAttempt = 0,
         public string $runId = '',
+        public ?string $prefetchedDynamicContent = null,
+        public ?string $forcedDynamicFailureMessage = null,
+        public bool $useNativeQueueing = false,
     ) {}
 
     public function handle(): void
@@ -114,7 +118,12 @@ class GenerateTechnicalMemorySection implements ShouldQueue
 
             $dynamicAgentMetrics['model_name'] = $dynamicAgent->modelName();
             $dynamicAgentMetrics['input_chars'] = max(0, $dynamicAgent->estimateInputChars());
-            $content = $dynamicAgent->generate();
+
+            if ($this->forcedDynamicFailureMessage !== null && $this->forcedDynamicFailureMessage !== '') {
+                throw new \RuntimeException($this->forcedDynamicFailureMessage);
+            }
+
+            $content = $this->prefetchedDynamicContent ?? $dynamicAgent->generate();
             $dynamicAgentMetrics['output_chars'] = max(0, mb_strlen(trim($content)));
             $dynamicAgentMetrics['status'] = 'completed';
             $dynamicAgentMetrics['usage'] = RecordAiUsageFromAgentPrompted::pullUsageForAgent(TechnicalMemoryDynamicSectionAgent::class);
@@ -216,6 +225,14 @@ class GenerateTechnicalMemorySection implements ShouldQueue
 
                     if ($this->batch() !== null) {
                         $this->batch()->add([$retryJob]);
+                    } elseif ($this->useNativeQueueing) {
+                        resolve(QueueGenerateTechnicalMemorySectionAction::class)(
+                            technicalMemorySectionId: $this->technicalMemorySectionId,
+                            section: $this->section,
+                            context: $context->withQualityFeedback($qualityFeedback),
+                            qualityAttempt: $this->qualityAttempt + 1,
+                            runId: $resolvedRunId,
+                        );
                     } else {
                         dispatch(new self(technicalMemorySectionId: $this->technicalMemorySectionId, section: $this->section, context: $context->withQualityFeedback($qualityFeedback), qualityAttempt: $this->qualityAttempt + 1, runId: $resolvedRunId));
                     }

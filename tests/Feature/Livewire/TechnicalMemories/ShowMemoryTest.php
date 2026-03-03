@@ -1,14 +1,14 @@
 <?php
 
+use App\Ai\Agents\TechnicalMemoryDynamicSectionAgent;
 use App\Enums\TechnicalMemorySectionStatus;
-use App\Jobs\GenerateTechnicalMemorySection;
 use App\Livewire\TechnicalMemories\ShowMemory;
 use App\Models\ExtractedCriterion;
 use App\Models\TechnicalMemory;
 use App\Models\TechnicalMemorySection;
 use App\Models\Tender;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Queue;
+use Laravel\Ai\QueuedAgentPrompt;
 use Livewire\Livewire;
 
 uses()->group('livewire');
@@ -272,6 +272,8 @@ it('can regenerate a single section from the memory view', function (): void {
         'score_points' => 16,
     ]);
 
+    TechnicalMemoryDynamicSectionAgent::fake()->preventStrayPrompts();
+
     Livewire::test(ShowMemory::class, ['tender' => $tender])
         ->call('regenerateSection', $section->id);
 
@@ -283,5 +285,8 @@ it('can regenerate a single section from the memory view', function (): void {
     expect($memory?->status)->toBe('draft');
     expect($memory?->generated_at)->toBeNull();
 
-    Queue::assertPushed(GenerateTechnicalMemorySection::class, fn (GenerateTechnicalMemorySection $job): bool => $job->technicalMemorySectionId === $section?->id);
+    TechnicalMemoryDynamicSectionAgent::assertQueued(function (QueuedAgentPrompt $prompt): bool {
+        return $prompt->agent instanceof TechnicalMemoryDynamicSectionAgent
+            && $prompt->prompt !== '';
+    });
 });
