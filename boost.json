@@ -1,12 +1,12 @@
 {
     "agents": [
-        "junie",
-        "copilot",
-        "opencode"
+        "opencode",
+        "claude_code"
     ],
     "guidelines": true,
     "herd_mcp": false,
     "mcp": true,
+    "nightwatch_mcp": false,
     "packages": [
         "laravel/ai",
         "spatie/laravel-pdf"
