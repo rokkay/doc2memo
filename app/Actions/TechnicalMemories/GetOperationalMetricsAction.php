@@ -18,16 +18,14 @@ final class GetOperationalMetricsAction
     {
         $metrics = TechnicalMemoryGenerationMetric::query()
             ->with(['technicalMemory:id,title', 'technicalMemorySection:id,section_title'])
-            ->whereBetween('created_at', [$from, $to])
-            ->orderBy('created_at')
+            ->whereBetween('created_at', [$from, $to])->oldest()
             ->get();
         $costEntries = AiCostEntry::query()
-            ->whereBetween('created_at', [$from, $to])
-            ->orderBy('created_at')
+            ->whereBetween('created_at', [$from, $to])->oldest()
             ->get();
         $documents = Document::query()
             ->whereBetween('analyzed_at', [$from, $to])
-            ->orderBy('analyzed_at')
+            ->oldest('analyzed_at')
             ->get();
 
         return new TechnicalMemoryOperationalMetricsData(

@@ -309,7 +309,7 @@ it('propagates one run id to every section generation job in a full generation',
             ->values();
 
         $runIds = $jobs
-            ->map(fn (GenerateTechnicalMemorySection $queuedJob): ?string => $queuedJob->runId)
+            ->map(fn (GenerateTechnicalMemorySection $queuedJob): string => $queuedJob->runId)
             ->filter(fn (?string $runId): bool => is_string($runId) && $runId !== '')
             ->unique()
             ->values();

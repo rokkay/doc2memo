@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('extracted_criteria', function (Blueprint $table) {
+        Schema::table('extracted_criteria', function (Blueprint $table): void {
             $table->enum('criterion_type', ['judgment', 'automatic'])
                 ->default('judgment')
                 ->after('priority');
@@ -32,7 +32,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('extracted_criteria', function (Blueprint $table) {
+        Schema::table('extracted_criteria', function (Blueprint $table): void {
             $table->dropIndex(['tender_id', 'group_key']);
             $table->dropIndex(['tender_id', 'criterion_type']);
             $table->dropColumn(['criterion_type', 'score_points', 'group_key']);

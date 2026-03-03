@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Support\TechnicalMemoryCostEstimator;
 
 it('estimates input output units and total cost for gpt-5-mini', function (): void {
-    $estimation = (new TechnicalMemoryCostEstimator(models: [
+    $estimation = new TechnicalMemoryCostEstimator(models: [
         'gpt-5-mini' => [
             'input_price_per_unit_usd' => 0.5,
             'output_price_per_unit_usd' => 1.0,
@@ -16,7 +16,7 @@ it('estimates input output units and total cost for gpt-5-mini', function (): vo
             'output_price_per_unit_usd' => 1.5,
             'unit_basis_chars' => 4_000_000,
         ],
-    ]))->estimate(
+    ])->estimate(
         model: 'gpt-5-mini',
         inputChars: 8_000,
         outputChars: 2_000,
@@ -30,7 +30,7 @@ it('estimates input output units and total cost for gpt-5-mini', function (): vo
 });
 
 it('estimates input output units and total cost for gpt-5.2', function (): void {
-    $estimation = (new TechnicalMemoryCostEstimator(models: [
+    $estimation = new TechnicalMemoryCostEstimator(models: [
         'gpt-5-mini' => [
             'input_price_per_unit_usd' => 0.5,
             'output_price_per_unit_usd' => 1.0,
@@ -41,7 +41,7 @@ it('estimates input output units and total cost for gpt-5.2', function (): void 
             'output_price_per_unit_usd' => 1.5,
             'unit_basis_chars' => 4_000_000,
         ],
-    ]))->estimate(
+    ])->estimate(
         model: 'gpt-5.2',
         inputChars: 12_000,
         outputChars: 4_000,
@@ -55,13 +55,13 @@ it('estimates input output units and total cost for gpt-5.2', function (): void 
 });
 
 it('keeps backward-compatible unsupported model exception', function (): void {
-    expect(fn (): array => (new TechnicalMemoryCostEstimator(models: [
+    expect(fn (): array => new TechnicalMemoryCostEstimator(models: [
         'gpt-5-mini' => [
             'input_price_per_unit_usd' => 0.5,
             'output_price_per_unit_usd' => 1.0,
             'unit_basis_chars' => 4_000_000,
         ],
-    ]))->estimate(
+    ])->estimate(
         model: 'gpt-unknown',
         inputChars: 100,
         outputChars: 100,

@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('technical_memory_metric_runs', function (Blueprint $table) {
+        Schema::table('technical_memory_metric_runs', function (Blueprint $table): void {
             $table->string('batch_id')->nullable()->after('run_id');
             $table->index('batch_id');
         });
@@ -22,7 +22,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('technical_memory_metric_runs', function (Blueprint $table) {
+        Schema::table('technical_memory_metric_runs', function (Blueprint $table): void {
             $table->dropIndex(['batch_id']);
             $table->dropColumn('batch_id');
         });

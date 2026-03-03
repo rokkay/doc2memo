@@ -8,7 +8,6 @@ use App\Data\JudgmentCriterionData;
 use App\Data\TechnicalMemoryGenerationContextData;
 use App\Data\TechnicalMemorySectionData;
 use App\Enums\TechnicalMemorySectionStatus;
-use App\Jobs\GenerateTechnicalMemorySection;
 use App\Models\DocumentInsight;
 use App\Models\ExtractedCriterion;
 use App\Models\ExtractedSpecification;
@@ -54,11 +53,11 @@ final class RegenerateSectionAction
         $context = new TechnicalMemoryGenerationContextData(
             pca: [
                 'criteria' => $this->buildPcaCriteriaPayload($preferredJudgmentCriteria),
-                'insights' => $this->buildInsightsPayload($tender, optional($tender->pcaDocument)->id),
+                'insights' => $this->buildInsightsPayload($tender, $tender->pcaDocument?->id),
             ],
             ppt: [
                 'specifications' => $this->buildSpecificationsPayload($tender),
-                'insights' => $this->buildInsightsPayload($tender, optional($tender->pptDocument)->id),
+                'insights' => $this->buildInsightsPayload($tender, $tender->pptDocument?->id),
             ],
             memoryTitle: (string) $memory->title,
             runId: (string) Str::uuid(),
@@ -82,12 +81,7 @@ final class RegenerateSectionAction
             sectionsTotal: 1,
         );
 
-        GenerateTechnicalMemorySection::dispatch(
-            technicalMemorySectionId: $section->id,
-            section: $sectionData,
-            context: $context,
-            runId: (string) $context->runId,
-        );
+        dispatch(new \App\Jobs\GenerateTechnicalMemorySection(technicalMemorySectionId: $section->id, section: $sectionData, context: $context, runId: (string) $context->runId));
     }
 
     /**

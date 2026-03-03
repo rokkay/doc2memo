@@ -21,7 +21,7 @@ class DocumentInsightFactory extends Factory
         return [
             'tender_id' => Tender::factory(),
             'document_id' => Document::factory(),
-            'section_reference' => fake()->optional()->regexify('[A-Z]\.[0-9]'),
+            'section_reference' => fake()->optional()->regexify('[A-Z]\.\d'),
             'topic' => fake()->words(2, true),
             'requirement_type' => fake()->randomElement([
                 'administrative',

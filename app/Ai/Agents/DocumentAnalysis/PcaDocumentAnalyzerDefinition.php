@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace App\Ai\Agents\DocumentAnalysis;
 
 use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Stringable;
 
 final class PcaDocumentAnalyzerDefinition extends DocumentAnalyzerDefinition
 {
-    public function instructions(): Stringable|string
+    public function instructions(): string
     {
         return <<<'INSTRUCTIONS'
 Eres un analista experto de licitaciones públicas en España.

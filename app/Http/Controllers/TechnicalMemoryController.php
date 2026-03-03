@@ -19,7 +19,7 @@ class TechnicalMemoryController extends Controller
 {
     public function show(Tender $tender): View
     {
-        return view('technical-memories.show', compact('tender'));
+        return view('technical-memories.show', ['tender' => $tender]);
     }
 
     public function download(TechnicalMemory $technicalMemory): PdfBuilder
@@ -87,8 +87,8 @@ class TechnicalMemoryController extends Controller
 
             foreach ($subsections as $subsection) {
                 $toc[] = [
-                    'id' => (string) $subsection['id'],
-                    'title' => (string) $subsection['title'],
+                    'id' => $subsection['id'],
+                    'title' => $subsection['title'],
                     'level' => 2,
                 ];
             }

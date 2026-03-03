@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Data;
 
-final class TechnicalMemoryOperationalMetricsData
+final readonly class TechnicalMemoryOperationalMetricsData
 {
     /**
      * @param  array<string,int|float>  $global
@@ -14,10 +14,10 @@ final class TechnicalMemoryOperationalMetricsData
      * @param  array<string,int|float>  $documentAnalysis
      */
     public function __construct(
-        public readonly array $global,
-        public readonly array $dailyTrend,
-        public readonly array $memories,
-        public readonly array $topProblematicSections,
-        public readonly array $documentAnalysis,
+        public array $global,
+        public array $dailyTrend,
+        public array $memories,
+        public array $topProblematicSections,
+        public array $documentAnalysis,
     ) {}
 }

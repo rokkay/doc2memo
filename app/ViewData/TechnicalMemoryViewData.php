@@ -14,7 +14,7 @@ use App\Support\TechnicalMemoryMarkdownBuilder;
 use App\Support\TechnicalMemoryMetrics;
 use Illuminate\Support\Collection;
 
-final class TechnicalMemoryViewData
+final readonly class TechnicalMemoryViewData
 {
     /**
      * @param  array<int,array{id:int,anchor:string,title:string,content:string,points:float,weight:float,criteria_count:int,status:string,evidence:array<int,array{label:string,detail:string,reference:?string}>}>  $sections
@@ -24,27 +24,27 @@ final class TechnicalMemoryViewData
      * @param  array<int,array{id:int,anchor:string,title:string,content:string,points:float,weight:float,criteria_count:int,status:string,evidence:array<int,array{label:string,detail:string,reference:?string}>}>  $failedSections
      */
     public function __construct(
-        public readonly bool $hasMemory,
-        public readonly bool $isGenerating,
-        public readonly array $sections,
-        public readonly array $inProgressSections,
-        public readonly array $pendingSections,
-        public readonly array $generatingSections,
-        public readonly array $failedSections,
-        public readonly int $pendingCount,
-        public readonly int $generatingCount,
-        public readonly int $failedCount,
-        public readonly int $completedCount,
-        public readonly int $totalCount,
-        public readonly float $totalPoints,
-        public readonly int $progressPercent,
-        public readonly string $markdownExport,
-        public readonly ?string $latestRunStatus,
-        public readonly ?int $latestRunDurationMs,
-        public readonly ?int $avgSectionDurationMs,
-        public readonly float $firstPassRate,
-        public readonly float $retryRate,
-        public readonly float $failureRate,
+        public bool $hasMemory,
+        public bool $isGenerating,
+        public array $sections,
+        public array $inProgressSections,
+        public array $pendingSections,
+        public array $generatingSections,
+        public array $failedSections,
+        public int $pendingCount,
+        public int $generatingCount,
+        public int $failedCount,
+        public int $completedCount,
+        public int $totalCount,
+        public float $totalPoints,
+        public int $progressPercent,
+        public string $markdownExport,
+        public ?string $latestRunStatus,
+        public ?int $latestRunDurationMs,
+        public ?int $avgSectionDurationMs,
+        public float $firstPassRate,
+        public float $retryRate,
+        public float $failureRate,
     ) {}
 
     public static function fromTender(Tender $tender): self

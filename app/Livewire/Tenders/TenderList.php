@@ -31,7 +31,7 @@ class TenderList extends Component
 
     public function render(): View
     {
-        $tenders = Tender::withCount('documents')
+        $tenders = Tender::query()->withCount('documents')
             ->when($this->search, function (Builder $query): void {
                 $query->where(function (Builder $query): void {
                     $query->where('title', 'like', '%'.$this->search.'%')

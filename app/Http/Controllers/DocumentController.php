@@ -16,6 +16,6 @@ class DocumentController extends Controller
 
     public function show(Document $document): View
     {
-        return view('documents.show', compact('document'));
+        return view('documents.show', ['document' => $document]);
     }
 }

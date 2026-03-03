@@ -71,7 +71,7 @@ it('creates tender with documents', function (): void {
         ->call('save')
         ->assertHasNoErrors();
 
-    $tender = Tender::where('title', 'Test Tender Title')->first();
+    $tender = Tender::query()->where('title', 'Test Tender Title')->first();
     expect($tender)->not->toBeNull();
     $component->assertRedirect(route('tenders.show', $tender));
 
@@ -79,7 +79,7 @@ it('creates tender with documents', function (): void {
     expect($tender->reference_number)->toBe('REF-123');
     expect($tender->status)->toBe('analyzing');
 
-    $documents = Document::where('tender_id', $tender->id)->get();
+    $documents = Document::query()->where('tender_id', $tender->id)->get();
     expect($documents)->toHaveCount(2);
     expect($documents->pluck('document_type'))->toContain('pca', 'ppt');
 
@@ -106,8 +106,8 @@ it('accepts deadline date as free text', function (): void {
 it('shows validation errors when submitting', function (): void {
     Livewire::test(CreateTender::class)
         ->set('form.title', '')
-        ->set('pcaFile', null)
-        ->set('pptFile', null)
+        ->set('pcaFile')
+        ->set('pptFile')
         ->call('save')
         ->assertHasErrors(['form.title', 'pcaFile', 'pptFile']);
 });

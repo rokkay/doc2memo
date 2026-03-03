@@ -6,6 +6,9 @@ use App\Models\TechnicalMemory;
 use App\Models\Tender;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/**
+ * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\TechnicalMemory>
+ */
 class TechnicalMemoryFactory extends Factory
 {
     protected $model = TechnicalMemory::class;

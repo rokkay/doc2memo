@@ -17,14 +17,9 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Smalot\PdfParser\Parser;
 
-final class ProcessDocumentAction
+final readonly class ProcessDocumentAction
 {
-    private JudgmentCriteriaParser $judgmentCriteriaParser;
-
-    public function __construct(?JudgmentCriteriaParser $judgmentCriteriaParser = null)
-    {
-        $this->judgmentCriteriaParser = $judgmentCriteriaParser ?? new JudgmentCriteriaParser;
-    }
+    public function __construct(private ?JudgmentCriteriaParser $judgmentCriteriaParser = new JudgmentCriteriaParser) {}
 
     public function __invoke(Document $document): void
     {
@@ -282,20 +277,18 @@ final class ProcessDocumentAction
         }
 
         return collect($subcriteria)
-            ->map(function (array $subcriterion) use ($criterion): JudgmentCriterionData {
-                return JudgmentCriterionData::fromArray([
-                    'section_number' => $subcriterion['section_number'] !== '' ? $subcriterion['section_number'] : $criterion->sectionNumber,
-                    'section_title' => $subcriterion['section_title'] !== '' ? $subcriterion['section_title'] : $criterion->sectionTitle,
-                    'description' => $subcriterion['section_title'] !== '' ? $subcriterion['section_title'] : $criterion->description,
-                    'priority' => $criterion->priority,
-                    'criterion_type' => 'judgment',
-                    'score_points' => $subcriterion['score_points'],
-                    'source' => 'parser',
-                    'confidence' => 0.65,
-                    'source_reference' => $criterion->sourceReference,
-                    'metadata' => $criterion->metadata,
-                ]);
-            })
+            ->map(fn (array $subcriterion): JudgmentCriterionData => JudgmentCriterionData::fromArray([
+                'section_number' => $subcriterion['section_number'] !== '' ? $subcriterion['section_number'] : $criterion->sectionNumber,
+                'section_title' => $subcriterion['section_title'] !== '' ? $subcriterion['section_title'] : $criterion->sectionTitle,
+                'description' => $subcriterion['section_title'] !== '' ? $subcriterion['section_title'] : $criterion->description,
+                'priority' => $criterion->priority,
+                'criterion_type' => 'judgment',
+                'score_points' => $subcriterion['score_points'],
+                'source' => 'parser',
+                'confidence' => 0.65,
+                'source_reference' => $criterion->sourceReference,
+                'metadata' => $criterion->metadata,
+            ]))
             ->all();
     }
 

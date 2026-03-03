@@ -20,7 +20,7 @@ class TechnicalMemorySectionFactory extends Factory
         return [
             'technical_memory_id' => TechnicalMemory::factory(),
             'group_key' => fake()->slug(3),
-            'section_number' => fake()->optional()->regexify('[0-9]\.[0-9]'),
+            'section_number' => fake()->optional()->regexify('\d\.\d'),
             'section_title' => fake()->sentence(4),
             'total_points' => fake()->randomFloat(2, 0, 100),
             'weight_percent' => fake()->randomFloat(2, 0, 100),

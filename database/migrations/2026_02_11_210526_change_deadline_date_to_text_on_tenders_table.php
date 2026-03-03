@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('tenders', function (Blueprint $table) {
+        Schema::table('tenders', function (Blueprint $table): void {
             $table->text('deadline_date')->nullable()->change();
         });
     }
@@ -21,7 +21,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('tenders', function (Blueprint $table) {
+        Schema::table('tenders', function (Blueprint $table): void {
             $table->date('deadline_date')->nullable()->change();
         });
     }

@@ -57,7 +57,7 @@ class GenerateTechnicalMemorySection implements ShouldQueue
         $resolvedRunId = $this->runId !== ''
             ? $this->runId
             : ($this->context->runId !== null && $this->context->runId !== ''
-                ? (string) $this->context->runId
+                ? $this->context->runId
                 : (string) Str::uuid());
 
         $context = $this->context->withRunId($resolvedRunId);
@@ -113,7 +113,7 @@ class GenerateTechnicalMemorySection implements ShouldQueue
             );
 
             $dynamicAgentMetrics['model_name'] = $dynamicAgent->modelName();
-            $dynamicAgentMetrics['input_chars'] = max(0, (int) $dynamicAgent->estimateInputChars());
+            $dynamicAgentMetrics['input_chars'] = max(0, $dynamicAgent->estimateInputChars());
             $content = $dynamicAgent->generate();
             $dynamicAgentMetrics['output_chars'] = max(0, mb_strlen(trim($content)));
             $dynamicAgentMetrics['status'] = 'completed';
@@ -126,7 +126,7 @@ class GenerateTechnicalMemorySection implements ShouldQueue
                     );
 
                     $styleEditorMetrics['model_name'] = $styleEditor->modelName();
-                    $styleEditorMetrics['input_chars'] = max(0, (int) $styleEditor->estimateInputChars($content));
+                    $styleEditorMetrics['input_chars'] = max(0, $styleEditor->estimateInputChars($content));
                     $editedContent = $styleEditor->edit($content);
                     $styleEditorMetrics['output_chars'] = max(0, mb_strlen(trim($editedContent)));
                     $styleEditorMetrics['status'] = 'completed';
@@ -217,13 +217,7 @@ class GenerateTechnicalMemorySection implements ShouldQueue
                     if ($this->batch() !== null) {
                         $this->batch()->add([$retryJob]);
                     } else {
-                        self::dispatch(
-                            technicalMemorySectionId: $this->technicalMemorySectionId,
-                            section: $this->section,
-                            context: $context->withQualityFeedback($qualityFeedback),
-                            qualityAttempt: $this->qualityAttempt + 1,
-                            runId: $resolvedRunId,
-                        );
+                        dispatch(new self(technicalMemorySectionId: $this->technicalMemorySectionId, section: $this->section, context: $context->withQualityFeedback($qualityFeedback), qualityAttempt: $this->qualityAttempt + 1, runId: $resolvedRunId));
                     }
 
                     $recordMetricEvent(
