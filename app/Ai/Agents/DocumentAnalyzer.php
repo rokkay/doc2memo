@@ -46,6 +46,14 @@ class DocumentAnalyzer implements Agent, HasStructuredOutput
     {
         $response = $this->prompt($content);
 
+        return $this->normalizeResponse($response);
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    public function normalizeResponse(mixed $response): array
+    {
         return $this->definition->normalizeResponse($response);
     }
 

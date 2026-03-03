@@ -24,12 +24,24 @@ final class AnalyzeDocumentWithMetricsAction
     public function __invoke(Document $document, string $text): array
     {
         $documentAnalyzer = new DocumentAnalyzer($document->document_type);
+        $analysis = $documentAnalyzer->analyze($text);
+
+        return $this->fromNormalizedAnalysis($document, $text, $analysis);
+    }
+
+    /**
+     * @param  array<string,mixed>  $analysis
+     * @return array{analysis:array<string,mixed>,costSummary:array{estimated_input_units:float,estimated_output_units:float,estimated_cost_usd:float,breakdown:array<string,array{model_name:string,input_chars:int,output_chars:int,estimated_input_units:float,estimated_output_units:float,estimated_cost_usd:float,status:string}>},dedicatedCriteria:array<int,JudgmentCriterionData>}
+     */
+    public function fromNormalizedAnalysis(Document $document, string $text, array $analysis): array
+    {
+        $documentAnalyzer = new DocumentAnalyzer($document->document_type);
         $analysisAgentMetrics = [
             'model_name' => $documentAnalyzer->modelName(),
             'input_chars' => max(0, $documentAnalyzer->estimateInputChars($text)),
-            'output_chars' => 0,
-            'status' => 'pending',
-            'usage' => null,
+            'output_chars' => $this->estimateSerializedChars($analysis),
+            'status' => 'completed',
+            'usage' => RecordAiUsageFromAgentPrompted::pullUsageForAgent(DocumentAnalyzer::class),
         ];
         $dedicatedExtractorMetrics = [
             'model_name' => PcaJudgmentCriteriaExtractorAgent::MODEL_NAME,
@@ -38,11 +50,6 @@ final class AnalyzeDocumentWithMetricsAction
             'status' => $document->document_type === 'pca' ? 'pending' : 'skipped',
             'usage' => null,
         ];
-
-        $analysis = $documentAnalyzer->analyze($text);
-        $analysisAgentMetrics['output_chars'] = $this->estimateSerializedChars($analysis);
-        $analysisAgentMetrics['status'] = 'completed';
-        $analysisAgentMetrics['usage'] = RecordAiUsageFromAgentPrompted::pullUsageForAgent(DocumentAnalyzer::class);
 
         $dedicatedCriteria = [];
 

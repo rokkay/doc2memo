@@ -13,9 +13,7 @@ use App\Models\ExtractedCriterion;
 use App\Models\ExtractedSpecification;
 use App\Support\JudgmentCriteriaParser;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Smalot\PdfParser\Parser;
 
 final class ProcessDocumentAction
 {
@@ -26,20 +24,23 @@ final class ProcessDocumentAction
         $this->judgmentCriteriaParser = $judgmentCriteriaParser ?? new JudgmentCriteriaParser;
     }
 
-    public function __invoke(Document $document): void
+    /**
+     * @param  array{analysis:array<string,mixed>,costSummary:array{estimated_input_units:float,estimated_output_units:float,estimated_cost_usd:float,breakdown:array<string,array<string,int|float|string>>},dedicatedCriteria:array<int,JudgmentCriterionData>}|null  $analysisPayload
+     */
+    public function __invoke(Document $document, ?array $analysisPayload = null): void
     {
         $document->update([
             'status' => 'processing',
             'processing_error' => null,
         ]);
 
-        $text = $this->extractText($document);
+        $text = resolve(ExtractDocumentTextAction::class)($document);
 
         $document->update([
             'extracted_text' => mb_substr($text, 0, 10000),
         ]);
 
-        $analysisPayload = resolve(AnalyzeDocumentWithMetricsAction::class)($document, $text);
+        $analysisPayload ??= resolve(AnalyzeDocumentWithMetricsAction::class)($document, $text);
         $analysis = $analysisPayload['analysis'];
         $costSummary = $analysisPayload['costSummary'];
         $dedicatedCriteria = $analysisPayload['dedicatedCriteria'];
@@ -119,21 +120,6 @@ final class ProcessDocumentAction
                 ],
             ]);
         }
-    }
-
-    private function extractText(Document $document): string
-    {
-        $filePath = Storage::path($document->file_path);
-        $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
-
-        if (in_array($extension, ['md', 'txt'], true)) {
-            return file_get_contents($filePath) ?: '';
-        }
-
-        $parser = new Parser;
-        $pdf = $parser->parseFile($filePath);
-
-        return $pdf->getText();
     }
 
     private function clearPreviousExtractions(Document $document): void

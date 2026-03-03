@@ -1,5 +1,6 @@
 <?php
 
+use App\Ai\Agents\DocumentAnalyzer;
 use App\Jobs\GenerateTechnicalMemorySection;
 use App\Livewire\Tenders\TenderDetail;
 use App\Models\Document;
@@ -12,7 +13,7 @@ use App\Services\DocumentAnalysisService;
 use Illuminate\Bus\PendingBatch;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
-use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
 uses()->group('livewire');
@@ -205,12 +206,18 @@ it('can trigger document analysis for a specific document', function (): void {
 });
 
 it('marks document as processing immediately when retry starts', function (): void {
-    Queue::fake();
+    Storage::fake('local');
+    DocumentAnalyzer::fake()->preventStrayPrompts();
 
     $tender = Tender::factory()->create();
+    $filePath = 'documents/'.$tender->id.'/retry.md';
+    Storage::disk('local')->put($filePath, '# Retry analysis');
+
     $document = Document::factory()->create([
         'tender_id' => $tender->id,
         'document_type' => 'pca',
+        'file_path' => $filePath,
+        'mime_type' => 'text/markdown',
         'status' => 'failed',
     ]);
 

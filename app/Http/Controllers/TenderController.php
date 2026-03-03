@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Jobs\ProcessDocument;
+use App\Actions\Documents\QueueDocumentAnalysisAction;
 use App\Models\Document;
 use App\Models\Tender;
 use App\Services\TechnicalMemoryGenerationService;
@@ -12,6 +12,8 @@ use Illuminate\View\View;
 
 class TenderController extends Controller
 {
+    public function __construct(private readonly QueueDocumentAnalysisAction $queueDocumentAnalysisAction) {}
+
     public function index(): View
     {
         return view('tenders.index');
@@ -57,7 +59,7 @@ class TenderController extends Controller
 
             // Start analysis immediately after upload
             foreach ($tender->documents as $document) {
-                ProcessDocument::dispatch($document);
+                ($this->queueDocumentAnalysisAction)($document);
             }
 
             $tender->update(['status' => 'analyzing']);
@@ -90,8 +92,7 @@ class TenderController extends Controller
 
         $documentCount = 0;
         foreach ($pendingDocuments as $document) {
-            ProcessDocument::dispatch($document);
-            $document->update(['status' => 'processing']);
+            ($this->queueDocumentAnalysisAction)($document);
             $documentCount++;
         }
 

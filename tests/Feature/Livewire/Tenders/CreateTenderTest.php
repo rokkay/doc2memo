@@ -1,12 +1,11 @@
 <?php
 
-use App\Jobs\ProcessDocument;
+use App\Ai\Agents\DocumentAnalyzer;
 use App\Livewire\Tenders\CreateTender;
 use App\Models\Document;
 use App\Models\Tender;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
@@ -59,15 +58,15 @@ it('validates file types', function (): void {
 
 it('creates tender with documents', function (): void {
     Storage::fake('local');
-    Queue::fake();
+    DocumentAnalyzer::fake()->preventStrayPrompts();
 
     $component = Livewire::test(CreateTender::class)
         ->set('form.title', 'Test Tender Title')
         ->set('form.issuing_company', 'Test Company')
         ->set('form.reference_number', 'REF-123')
         ->set('form.description', 'Test description')
-        ->set('pcaFile', UploadedFile::fake()->create('pca.pdf', 100, 'application/pdf'))
-        ->set('pptFile', UploadedFile::fake()->create('ppt.pdf', 100, 'application/pdf'))
+        ->set('pcaFile', UploadedFile::fake()->create('pca.md', 100, 'text/markdown'))
+        ->set('pptFile', UploadedFile::fake()->create('ppt.md', 100, 'text/markdown'))
         ->call('save')
         ->assertHasNoErrors();
 
@@ -83,18 +82,22 @@ it('creates tender with documents', function (): void {
     expect($documents)->toHaveCount(2);
     expect($documents->pluck('document_type'))->toContain('pca', 'ppt');
 
-    Queue::assertPushed(ProcessDocument::class, 2);
+    expect($documents->where('status', 'processing'))->toHaveCount(2);
+
+    DocumentAnalyzer::assertQueued(function ($prompt): bool {
+        return $prompt->agent instanceof DocumentAnalyzer;
+    });
 });
 
 it('accepts deadline date as free text', function (): void {
     Storage::fake('local');
-    Queue::fake();
+    DocumentAnalyzer::fake()->preventStrayPrompts();
 
     Livewire::test(CreateTender::class)
         ->set('form.title', 'Tender with textual deadline')
         ->set('form.deadline_date', '15 dias naturales desde la publicacion')
-        ->set('pcaFile', UploadedFile::fake()->create('pca.pdf', 100, 'application/pdf'))
-        ->set('pptFile', UploadedFile::fake()->create('ppt.pdf', 100, 'application/pdf'))
+        ->set('pcaFile', UploadedFile::fake()->create('pca.md', 100, 'text/markdown'))
+        ->set('pptFile', UploadedFile::fake()->create('ppt.md', 100, 'text/markdown'))
         ->call('save')
         ->assertHasNoErrors();
 

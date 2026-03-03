@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Actions\Tenders;
 
-use App\Jobs\ProcessDocument;
+use App\Actions\Documents\QueueDocumentAnalysisAction;
 use App\Models\Tender;
 
 final class AnalyzeTenderDocumentsAction
 {
+    public function __construct(private readonly QueueDocumentAnalysisAction $queueDocumentAnalysisAction) {}
+
     public function __invoke(Tender $tender): void
     {
         $documents = $tender->documents()
@@ -16,12 +18,7 @@ final class AnalyzeTenderDocumentsAction
             ->get();
 
         foreach ($documents as $document) {
-            $document->update([
-                'status' => 'processing',
-                'processing_error' => null,
-            ]);
-
-            ProcessDocument::dispatch($document);
+            ($this->queueDocumentAnalysisAction)($document);
         }
 
         if ($documents->isNotEmpty()) {

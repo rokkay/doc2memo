@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Actions\Documents\AnalyzeDocumentWithMetricsAction;
+use App\Actions\Documents\ApplyQueuedDocumentAnalysisFailureAction;
+use App\Actions\Documents\ApplyQueuedDocumentAnalysisSuccessAction;
 use App\Ai\Agents\DocumentAnalyzer;
 use App\Enums\AiCostCategory;
 use App\Jobs\ProcessDocument;
@@ -378,4 +380,86 @@ it('stores analyzer token usage metadata and char fallback for document analysis
         ->and((int) ($extractorEntry?->input_chars ?? 0))->toBe(0);
 
     RecordAiUsageFromAgentPrompted::flush();
+});
+
+it('applies queued analyzer success side effects with behavior parity', function (): void {
+    Storage::fake('local');
+
+    $tender = Tender::factory()->pending()->create();
+
+    $filePath = 'documents/'.$tender->id.'/pca.md';
+    Storage::disk('local')->put($filePath, '# PCA'.PHP_EOL.PHP_EOL.'Plazo y presupuesto');
+
+    $document = Document::factory()->create([
+        'tender_id' => $tender->id,
+        'document_type' => 'pca',
+        'file_path' => $filePath,
+        'mime_type' => 'text/markdown',
+        'status' => 'processing',
+    ]);
+
+    resolve(ApplyQueuedDocumentAnalysisSuccessAction::class)($document->id, [
+        'tender_info' => [
+            'title' => 'Servicio Portal Web',
+            'issuing_company' => 'Fundacion Cidade da Cultura',
+            'reference_number' => 'CDC-2026-0003',
+            'deadline_date' => '2026-03-01',
+            'description' => 'Contrato de servicios de portal web',
+        ],
+        'criteria' => [
+            [
+                'section_number' => 'A',
+                'section_title' => 'Presupuesto base',
+                'description' => 'Presupuesto maximo 251.559,00 EUR IVA incluido.',
+                'priority' => 'mandatory',
+                'metadata' => ['amount' => '251559'],
+            ],
+        ],
+        'insights' => [
+            [
+                'section_reference' => 'A.1',
+                'topic' => 'Presupuesto',
+                'requirement_type' => 'budget',
+                'importance' => 'high',
+                'statement' => 'La oferta no debe superar el presupuesto base.',
+                'evidence_excerpt' => 'Presupuesto base de licitacion con IVA: 251.559,00 EUR',
+            ],
+        ],
+    ]);
+
+    $processedDocument = $document->fresh();
+
+    expect($processedDocument?->status)->toBe('analyzed')
+        ->and($processedDocument?->analyzed_at)->not->toBeNull();
+
+    assertDatabaseHas('extracted_criteria', [
+        'document_id' => $document->id,
+        'section_title' => 'Presupuesto base',
+    ]);
+
+    assertDatabaseHas('document_insights', [
+        'document_id' => $document->id,
+        'topic' => 'Presupuesto',
+    ]);
+
+    expect(DB::table('ai_cost_entries')->where('document_id', $document->id)->count())->toBe(2);
+});
+
+it('applies queued analyzer failure side effects with behavior parity', function (): void {
+    $tender = Tender::factory()->pending()->create();
+
+    $document = Document::factory()->create([
+        'tender_id' => $tender->id,
+        'document_type' => 'pca',
+        'status' => 'processing',
+    ]);
+
+    resolve(ApplyQueuedDocumentAnalysisFailureAction::class)($document->id, new \RuntimeException('queued-failure'));
+
+    $failedDocument = $document->fresh();
+
+    expect($failedDocument?->status)->toBe('failed')
+        ->and($failedDocument?->processing_error)->toBe('queued-failure')
+        ->and($failedDocument?->extracted_text)->toBe('Error: queued-failure')
+        ->and($tender->fresh()->status)->toBe('failed');
 });

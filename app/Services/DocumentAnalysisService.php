@@ -2,14 +2,17 @@
 
 namespace App\Services;
 
+use App\Actions\Documents\QueueDocumentAnalysisAction;
 use App\Actions\Tenders\AnalyzeTenderDocumentsAction;
-use App\Jobs\ProcessDocument;
 use App\Models\Document;
 use App\Models\Tender;
 
 class DocumentAnalysisService
 {
-    public function __construct(private readonly AnalyzeTenderDocumentsAction $analyzeTenderDocumentsAction) {}
+    public function __construct(
+        private readonly AnalyzeTenderDocumentsAction $analyzeTenderDocumentsAction,
+        private readonly QueueDocumentAnalysisAction $queueDocumentAnalysisAction,
+    ) {}
 
     public function analyzeTender(Tender $tender): void
     {
@@ -26,12 +29,7 @@ class DocumentAnalysisService
             return;
         }
 
-        $document->update([
-            'status' => 'processing',
-            'processing_error' => null,
-        ]);
-
-        ProcessDocument::dispatch($document);
+        ($this->queueDocumentAnalysisAction)($document);
         $tender->update(['status' => 'analyzing']);
     }
 }
