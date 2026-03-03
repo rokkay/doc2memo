@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('extracted_criteria', function (Blueprint $table) {
+        Schema::table('extracted_criteria', function (Blueprint $table): void {
             $table->string('source_reference')
                 ->nullable()
                 ->after('confidence');
@@ -25,7 +25,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('extracted_criteria', function (Blueprint $table) {
+        Schema::table('extracted_criteria', function (Blueprint $table): void {
             $table->dropIndex(['document_id', 'source_reference']);
             $table->dropColumn('source_reference');
         });

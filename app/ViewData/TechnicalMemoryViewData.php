@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace App\ViewData;
 
 use App\Enums\TechnicalMemorySectionStatus;
+use App\Models\ExtractedCriterion;
+use App\Models\TechnicalMemoryMetricEvent;
+use App\Models\TechnicalMemorySection;
 use App\Models\Tender;
 use App\Support\SectionTitleNormalizer;
 use App\Support\TechnicalMemoryMarkdownBuilder;
 use App\Support\TechnicalMemoryMetrics;
+use Illuminate\Support\Collection;
 
-final class TechnicalMemoryViewData
+final readonly class TechnicalMemoryViewData
 {
     /**
      * @param  array<int,array{id:int,anchor:string,title:string,content:string,points:float,weight:float,criteria_count:int,status:string,evidence:array<int,array{label:string,detail:string,reference:?string}>}>  $sections
@@ -20,27 +24,27 @@ final class TechnicalMemoryViewData
      * @param  array<int,array{id:int,anchor:string,title:string,content:string,points:float,weight:float,criteria_count:int,status:string,evidence:array<int,array{label:string,detail:string,reference:?string}>}>  $failedSections
      */
     public function __construct(
-        public readonly bool $hasMemory,
-        public readonly bool $isGenerating,
-        public readonly array $sections,
-        public readonly array $inProgressSections,
-        public readonly array $pendingSections,
-        public readonly array $generatingSections,
-        public readonly array $failedSections,
-        public readonly int $pendingCount,
-        public readonly int $generatingCount,
-        public readonly int $failedCount,
-        public readonly int $completedCount,
-        public readonly int $totalCount,
-        public readonly float $totalPoints,
-        public readonly int $progressPercent,
-        public readonly string $markdownExport,
-        public readonly ?string $latestRunStatus,
-        public readonly ?int $latestRunDurationMs,
-        public readonly ?int $avgSectionDurationMs,
-        public readonly float $firstPassRate,
-        public readonly float $retryRate,
-        public readonly float $failureRate,
+        public bool $hasMemory,
+        public bool $isGenerating,
+        public array $sections,
+        public array $inProgressSections,
+        public array $pendingSections,
+        public array $generatingSections,
+        public array $failedSections,
+        public int $pendingCount,
+        public int $generatingCount,
+        public int $failedCount,
+        public int $completedCount,
+        public int $totalCount,
+        public float $totalPoints,
+        public int $progressPercent,
+        public string $markdownExport,
+        public ?string $latestRunStatus,
+        public ?int $latestRunDurationMs,
+        public ?int $avgSectionDurationMs,
+        public float $firstPassRate,
+        public float $retryRate,
+        public float $failureRate,
     ) {}
 
     public static function fromTender(Tender $tender): self
@@ -92,16 +96,16 @@ final class TechnicalMemoryViewData
                 ->get();
 
             $terminalEventsBySection = $events
-                ->filter(fn ($event): bool => $event->technical_memory_section_id !== null)
+                ->filter(fn (TechnicalMemoryMetricEvent $event): bool => $event->technical_memory_section_id !== null)
                 ->groupBy('technical_memory_section_id')
-                ->map(fn ($sectionEvents) => $sectionEvents
+                ->map(fn (Collection $sectionEvents): ?TechnicalMemoryMetricEvent => $sectionEvents
                     ->whereIn('event_type', [TechnicalMemoryMetrics::EVENT_COMPLETED, TechnicalMemoryMetrics::EVENT_FAILED])
                     ->last())
                 ->filter();
 
             $durations = $terminalEventsBySection
                 ->pluck('duration_ms')
-                ->filter(fn ($duration): bool => is_int($duration));
+                ->filter(fn (mixed $duration): bool => is_int($duration));
 
             if ($durations->isNotEmpty()) {
                 $avgSectionDurationMs = (int) round($durations->avg());
@@ -111,7 +115,7 @@ final class TechnicalMemoryViewData
 
             if ($sectionsTotal > 0) {
                 $completedOnFirstPass = $terminalEventsBySection
-                    ->filter(fn ($event): bool => $event->event_type === TechnicalMemoryMetrics::EVENT_COMPLETED && $event->attempt === 1)
+                    ->filter(fn (TechnicalMemoryMetricEvent $event): bool => $event->event_type === TechnicalMemoryMetrics::EVENT_COMPLETED && $event->attempt === 1)
                     ->count();
 
                 $firstPassRate = round(($completedOnFirstPass / $sectionsTotal) * 100, 1);
@@ -122,17 +126,17 @@ final class TechnicalMemoryViewData
 
         $criteriaByGroup = $tender->extractedCriteria
             ->where('criterion_type', 'judgment')
-            ->groupBy(fn ($criterion): string => (string) ($criterion->group_key ?? ''));
+            ->groupBy(fn (ExtractedCriterion $criterion): string => (string) ($criterion->group_key ?? ''));
 
         $sections = $memory->sections
             ->sortBy('sort_order')
-            ->map(function ($section) use ($criteriaByGroup): array {
+            ->map(function (TechnicalMemorySection $section) use ($criteriaByGroup): array {
                 $anchor = 'section-'.$section->id;
                 $groupKey = (string) ($section->group_key ?? '');
                 $criteria = $criteriaByGroup->get($groupKey, collect());
 
                 $evidence = $criteria
-                    ->map(function ($criterion): array {
+                    ->map(function (ExtractedCriterion $criterion): array {
                         $label = trim((string) ($criterion->section_number ?? ''));
                         $label = $label !== '' ? $label : 'Criterio';
 

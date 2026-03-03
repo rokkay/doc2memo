@@ -3,6 +3,7 @@
 namespace App\Livewire\Tenders;
 
 use App\Models\Tender;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\View\View;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -30,15 +31,15 @@ class TenderList extends Component
 
     public function render(): View
     {
-        $tenders = Tender::withCount('documents')
-            ->when($this->search, function ($query): void {
-                $query->where(function ($query): void {
+        $tenders = Tender::query()->withCount('documents')
+            ->when($this->search, function (Builder $query): void {
+                $query->where(function (Builder $query): void {
                     $query->where('title', 'like', '%'.$this->search.'%')
                         ->orWhere('issuing_company', 'like', '%'.$this->search.'%')
                         ->orWhere('reference_number', 'like', '%'.$this->search.'%');
                 });
             })
-            ->when($this->statusFilter, function ($query): void {
+            ->when($this->statusFilter, function (Builder $query): void {
                 $query->where('status', $this->statusFilter);
             })
             ->latest()

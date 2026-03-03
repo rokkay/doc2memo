@@ -16,7 +16,7 @@ it('returns pca response shape for pca documents', function (): void {
         ],
     ])->preventStrayPrompts();
 
-    $result = (new DocumentAnalyzer('pca'))->analyze('contenido');
+    $result = new DocumentAnalyzer('pca')->analyze('contenido');
 
     expect($result)
         ->toHaveKeys(['tender_info', 'criteria', 'insights'])
@@ -31,7 +31,7 @@ it('returns ppt response shape for ppt documents', function (): void {
         ],
     ])->preventStrayPrompts();
 
-    $result = (new DocumentAnalyzer('ppt'))->analyze('contenido');
+    $result = new DocumentAnalyzer('ppt')->analyze('contenido');
 
     expect($result)
         ->toHaveKeys(['specifications', 'insights'])

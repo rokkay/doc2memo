@@ -10,7 +10,9 @@ use App\Data\TechnicalMemoryGenerationContextData;
 use App\Data\TechnicalMemorySectionData;
 use App\Enums\TechnicalMemorySectionStatus;
 use App\Jobs\GenerateTechnicalMemorySection;
+use App\Models\DocumentInsight;
 use App\Models\ExtractedCriterion;
+use App\Models\ExtractedSpecification;
 use App\Models\TechnicalMemory;
 use App\Models\TechnicalMemorySection;
 use App\Models\Tender;
@@ -20,14 +22,9 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Str;
 
-final class GenerateTechnicalMemoryAction
+final readonly class GenerateTechnicalMemoryAction
 {
-    private JudgmentCriteriaParser $judgmentCriteriaParser;
-
-    public function __construct(?JudgmentCriteriaParser $judgmentCriteriaParser = null)
-    {
-        $this->judgmentCriteriaParser = $judgmentCriteriaParser ?? new JudgmentCriteriaParser;
-    }
+    public function __construct(private ?JudgmentCriteriaParser $judgmentCriteriaParser = new JudgmentCriteriaParser) {}
 
     public function __invoke(Tender $tender): void
     {
@@ -42,11 +39,11 @@ final class GenerateTechnicalMemoryAction
                 ->map(fn (JudgmentCriterionData $item): array => $item->toArray())
                 ->all(),
             'insights' => $tender->documentInsights()
-                ->where('document_id', optional($tender->pcaDocument)->id)
+                ->where('document_id', $tender->pcaDocument?->id)
                 ->orderByDesc('importance')
                 ->orderBy('id')
                 ->get()
-                ->map(fn ($item) => [
+                ->map(fn (DocumentInsight $item): array => [
                     'section_reference' => $item->section_reference,
                     'topic' => $item->topic,
                     'requirement_type' => $item->requirement_type,
@@ -61,7 +58,7 @@ final class GenerateTechnicalMemoryAction
             'specifications' => $tender->extractedSpecifications()
                 ->orderBy('id')
                 ->get()
-                ->map(fn ($item) => [
+                ->map(fn (ExtractedSpecification $item): array => [
                     'section_number' => $item->section_number,
                     'section_title' => $item->section_title,
                     'technical_description' => $item->technical_description,
@@ -71,11 +68,11 @@ final class GenerateTechnicalMemoryAction
                 ])
                 ->all(),
             'insights' => $tender->documentInsights()
-                ->where('document_id', optional($tender->pptDocument)->id)
+                ->where('document_id', $tender->pptDocument?->id)
                 ->orderByDesc('importance')
                 ->orderBy('id')
                 ->get()
-                ->map(fn ($item) => [
+                ->map(fn (DocumentInsight $item): array => [
                     'section_reference' => $item->section_reference,
                     'topic' => $item->topic,
                     'requirement_type' => $item->requirement_type,
@@ -89,7 +86,7 @@ final class GenerateTechnicalMemoryAction
         $generationContext = new TechnicalMemoryGenerationContextData(
             pca: $pcaData,
             ppt: $pptData,
-            memoryTitle: (string) ('Memoria Técnica - '.$tender->title),
+            memoryTitle: 'Memoria Técnica - '.$tender->title,
             runId: (string) Str::uuid(),
         );
 

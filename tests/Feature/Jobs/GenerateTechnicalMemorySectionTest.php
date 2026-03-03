@@ -59,7 +59,7 @@ it('generates a section and keeps memory in draft when pending sections remain',
         ['content' => $richMethodologyContent],
     ])->preventStrayPrompts();
 
-    (new GenerateTechnicalMemorySection(
+    new GenerateTechnicalMemorySection(
         technicalMemorySectionId: $section->id,
         section: TechnicalMemorySectionData::fromArray([
             'group_key' => '1.1-metodologia',
@@ -75,7 +75,7 @@ it('generates a section and keeps memory in draft when pending sections remain',
             'ppt' => ['specifications' => []],
             'memory_title' => 'Memoria test',
         ]),
-    ))->handle();
+    )->handle();
 
     $section = $section->fresh();
     $memory = $memory->fresh();
@@ -179,7 +179,7 @@ it('marks memory as generated when all dynamic sections finish', function (): vo
         ['content' => $richGovernanceContent],
     ])->preventStrayPrompts();
 
-    (new GenerateTechnicalMemorySection(
+    new GenerateTechnicalMemorySection(
         technicalMemorySectionId: $section->id,
         section: TechnicalMemorySectionData::fromArray([
             'group_key' => '2.1-gobierno',
@@ -195,7 +195,7 @@ it('marks memory as generated when all dynamic sections finish', function (): vo
             'ppt' => ['specifications' => []],
             'memory_title' => 'Memoria test',
         ]),
-    ))->handle();
+    )->handle();
 
     $memory = $memory->fresh();
     $section = $section->fresh();
@@ -231,7 +231,7 @@ it('retries once when generated section does not meet quality gate', function ()
         ['content' => '### Resumen breve\n\nTexto corto.'],
     ])->preventStrayPrompts();
 
-    (new GenerateTechnicalMemorySection(
+    new GenerateTechnicalMemorySection(
         technicalMemorySectionId: $section->id,
         section: TechnicalMemorySectionData::fromArray([
             'group_key' => '2.1-metodologia',
@@ -247,20 +247,18 @@ it('retries once when generated section does not meet quality gate', function ()
             'ppt' => ['specifications' => []],
             'memory_title' => 'Memoria test',
         ]),
-    ))->handle();
+    )->handle();
 
     $section = $section->fresh();
 
     expect($section?->status)->toBe(TechnicalMemorySectionStatus::Pending);
     expect($section?->error_message)->not->toBeNull();
 
-    Queue::assertPushed(GenerateTechnicalMemorySection::class, function (GenerateTechnicalMemorySection $job): bool {
-        return $job->technicalMemorySectionId > 0
-            && $job->qualityAttempt === 1
-            && $job->context->qualityFeedback !== null
-            && is_string($job->context->runId)
-            && $job->context->runId !== '';
-    });
+    Queue::assertPushed(GenerateTechnicalMemorySection::class, fn (GenerateTechnicalMemorySection $job): bool => $job->technicalMemorySectionId > 0
+        && $job->qualityAttempt === 1
+        && $job->context->qualityFeedback !== null
+        && is_string($job->context->runId)
+        && $job->context->runId !== '');
 
     $metric = TechnicalMemoryGenerationMetric::query()
         ->where('technical_memory_id', $memory->id)
@@ -310,7 +308,7 @@ it('persists skipped style editor ai entries and keeps total cost aligned', func
         ['content' => $richContent],
     ])->preventStrayPrompts();
 
-    (new GenerateTechnicalMemorySection(
+    new GenerateTechnicalMemorySection(
         technicalMemorySectionId: $section->id,
         section: TechnicalMemorySectionData::fromArray([
             'group_key' => '1.1-metodologia',
@@ -326,7 +324,7 @@ it('persists skipped style editor ai entries and keeps total cost aligned', func
             'ppt' => ['specifications' => []],
             'memory_title' => 'Memoria test',
         ]),
-    ))->handle();
+    )->handle();
 
     $metric = TechnicalMemoryGenerationMetric::query()
         ->where('technical_memory_id', $memory->id)
@@ -392,7 +390,7 @@ it('stores token usage metadata when sdk usage is available and keeps char fallb
         ['content' => $richContent],
     ])->preventStrayPrompts();
 
-    (new GenerateTechnicalMemorySection(
+    new GenerateTechnicalMemorySection(
         technicalMemorySectionId: $section->id,
         section: TechnicalMemorySectionData::fromArray([
             'group_key' => '1.1-metodologia',
@@ -408,7 +406,7 @@ it('stores token usage metadata when sdk usage is available and keeps char fallb
             'ppt' => ['specifications' => []],
             'memory_title' => 'Memoria test',
         ]),
-    ))->handle();
+    )->handle();
 
     $metric = TechnicalMemoryGenerationMetric::query()
         ->where('technical_memory_id', $memory->id)

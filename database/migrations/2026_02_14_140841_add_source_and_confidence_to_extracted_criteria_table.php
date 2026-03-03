@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('extracted_criteria', function (Blueprint $table) {
+        Schema::table('extracted_criteria', function (Blueprint $table): void {
             $table->string('source')
                 ->default('analyzer')
                 ->after('group_key');
@@ -28,7 +28,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('extracted_criteria', function (Blueprint $table) {
+        Schema::table('extracted_criteria', function (Blueprint $table): void {
             $table->dropIndex(['document_id', 'source']);
             $table->dropColumn(['source', 'confidence']);
         });

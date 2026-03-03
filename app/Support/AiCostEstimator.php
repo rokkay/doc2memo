@@ -7,7 +7,7 @@ namespace App\Support;
 use InvalidArgumentException;
 use Throwable;
 
-final class AiCostEstimator
+final readonly class AiCostEstimator
 {
     /**
      * @param  array<string,array<string,int|float>>|null  $models
@@ -22,9 +22,7 @@ final class AiCostEstimator
         $models = $this->resolveModels();
         $modelConfig = $models[$model] ?? null;
 
-        if (! is_array($modelConfig)) {
-            throw new InvalidArgumentException("Unsupported model [{$model}] for cost estimation.");
-        }
+        throw_unless(is_array($modelConfig), InvalidArgumentException::class, "Unsupported model [{$model}] for cost estimation.");
 
         $unitBasisChars = max(1, (int) ($modelConfig['unit_basis_chars'] ?? 1));
         $inputUnits = round(max(0, $inputChars) / $unitBasisChars, 4);

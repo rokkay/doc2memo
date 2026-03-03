@@ -5,14 +5,13 @@ declare(strict_types=1);
 use App\Models\TechnicalMemory;
 use App\Models\TechnicalMemorySection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Carbon;
 
 use function Pest\Laravel\artisan;
 
 uses(RefreshDatabase::class);
 
 it('purges technical memory metrics older than configured retention days', function (): void {
-    Carbon::setTestNow('2026-02-14 12:00:00');
+    \Illuminate\Support\Facades\Date::setTestNow('2026-02-14 12:00:00');
 
     $memory = TechnicalMemory::factory()->create();
     $section = TechnicalMemorySection::factory()->create([
@@ -84,5 +83,5 @@ it('purges technical memory metrics older than configured retention days', funct
         ->and($memory->metricEvents()->whereKey($staleEvent->id)->exists())->toBeFalse()
         ->and($memory->metricEvents()->whereKey($freshEvent->id)->exists())->toBeTrue();
 
-    Carbon::setTestNow();
+    \Illuminate\Support\Facades\Date::setTestNow();
 });

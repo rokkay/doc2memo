@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('technical_memory_sections', function (Blueprint $table) {
+        Schema::create('technical_memory_sections', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('technical_memory_id')->constrained()->cascadeOnDelete();
             $table->string('group_key');

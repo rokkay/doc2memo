@@ -135,7 +135,7 @@ final class AnalyzeDocumentWithMetricsAction
                     'confidence' => 0.95,
                     'source_reference' => $this->resolveSourceReference(
                         sectionNumber: is_string($item['section_number'] ?? null) ? $item['section_number'] : null,
-                        sectionTitle: (string) ($item['section_title'] ?? ''),
+                        sectionTitle: $item['section_title'] ?? '',
                         metadata: is_array($item['metadata'] ?? null) ? $item['metadata'] : [],
                     ),
                     'group_key' => '',
@@ -165,9 +165,9 @@ final class AnalyzeDocumentWithMetricsAction
             ->filter(fn (mixed $criterion): bool => is_array($criterion))
             ->contains(function (array $criterion): bool {
                 $content = Str::of(
-                    (string) ($criterion['section_number'] ?? '')
-                    .' '.(string) ($criterion['section_title'] ?? '')
-                    .' '.(string) ($criterion['description'] ?? '')
+                    ($criterion['section_number'] ?? '')
+                    .' '.($criterion['section_title'] ?? '')
+                    .' '.($criterion['description'] ?? '')
                 )->lower()->toString();
 
                 return preg_match('/juicio\s+de\s+valor|sobre\s*b|criterios?\s+b/u', $content) === 1;

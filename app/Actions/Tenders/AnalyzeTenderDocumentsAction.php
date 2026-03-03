@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Actions\Tenders;
 
-use App\Jobs\ProcessDocument;
 use App\Models\Tender;
 
 final class AnalyzeTenderDocumentsAction
@@ -21,7 +20,7 @@ final class AnalyzeTenderDocumentsAction
                 'processing_error' => null,
             ]);
 
-            ProcessDocument::dispatch($document);
+            dispatch(new \App\Jobs\ProcessDocument($document));
         }
 
         if ($documents->isNotEmpty()) {

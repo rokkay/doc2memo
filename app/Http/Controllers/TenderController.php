@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Jobs\ProcessDocument;
 use App\Models\Document;
 use App\Models\Tender;
 use App\Services\TechnicalMemoryGenerationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\View\View;
 
 class TenderController extends Controller
@@ -25,13 +25,13 @@ class TenderController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'issuing_company' => 'nullable|string|max:255',
-            'description' => 'nullable|string',
-            'deadline_date' => 'nullable|date',
-            'reference_number' => 'nullable|string|max:100',
-            'pca_file' => 'required|file|mimes:pdf,md,txt|max:10240',
-            'ppt_file' => 'required|file|mimes:pdf,md,txt|max:10240',
+            'title' => ['required', 'string', 'max:255'],
+            'issuing_company' => ['nullable', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'deadline_date' => ['nullable', 'date'],
+            'reference_number' => ['nullable', 'string', 'max:100'],
+            'pca_file' => ['required', 'file', 'mimes:pdf,md,txt', 'max:10240'],
+            'ppt_file' => ['required', 'file', 'mimes:pdf,md,txt', 'max:10240'],
         ], [
             'title.required' => 'El título de la licitación es obligatorio.',
             'pca_file.required' => 'El archivo PCA (Pliego de Condiciones Administrativas) es obligatorio.',
@@ -57,17 +57,15 @@ class TenderController extends Controller
 
             // Start analysis immediately after upload
             foreach ($tender->documents as $document) {
-                ProcessDocument::dispatch($document);
+                dispatch(new \App\Jobs\ProcessDocument($document));
             }
 
             $tender->update(['status' => 'analyzing']);
 
-            return redirect()
-                ->route('tenders.show', $tender)
+            return to_route('tenders.show', $tender)
                 ->with('success', "¡Licitación '{$tender->title}' creada exitosamente! Los documentos están siendo analizados por la IA. Esto puede tardar unos minutos.");
         } catch (\Exception $e) {
-            return redirect()
-                ->back()
+            return back()
                 ->with('error', 'Error al crear la licitación: '.$e->getMessage())
                 ->withInput();
         }
@@ -75,7 +73,7 @@ class TenderController extends Controller
 
     public function show(Tender $tender): View
     {
-        return view('tenders.show', compact('tender'));
+        return view('tenders.show', ['tender' => $tender]);
     }
 
     public function analyze(Tender $tender): RedirectResponse
@@ -83,14 +81,13 @@ class TenderController extends Controller
         $pendingDocuments = $tender->documents->where('status', 'uploaded');
 
         if ($pendingDocuments->isEmpty()) {
-            return redirect()
-                ->back()
+            return back()
                 ->with('info', 'No hay documentos pendientes de análisis. Todos los documentos ya han sido procesados.');
         }
 
         $documentCount = 0;
         foreach ($pendingDocuments as $document) {
-            ProcessDocument::dispatch($document);
+            dispatch(new \App\Jobs\ProcessDocument($document));
             $document->update(['status' => 'processing']);
             $documentCount++;
         }
@@ -99,8 +96,7 @@ class TenderController extends Controller
 
         $docNames = $pendingDocuments->pluck('original_filename')->implode(', ');
 
-        return redirect()
-            ->back()
+        return back()
             ->with('success', "Análisis iniciado para {$documentCount} documento(s): {$docNames}. La IA está extrayendo información. Puedes seguir el progreso en esta página.");
     }
 
@@ -115,25 +111,22 @@ class TenderController extends Controller
                 $missing[] = 'especificaciones del PPT';
             }
 
-            return redirect()
-                ->back()
+            return back()
                 ->with('error', 'No se puede generar la memoria técnica. Faltan: '.implode(' y ', $missing).'. Por favor, analiza ambos documentos primero.');
         }
 
         if ($tender->technicalMemory) {
-            return redirect()
-                ->back()
+            return back()
                 ->with('info', 'Ya existe una memoria técnica generada para esta licitación. Puedes verla en la pestaña "Memoria Técnica".');
         }
 
         $technicalMemoryGenerationService->generate($tender);
 
-        return redirect()
-            ->back()
+        return back()
             ->with('success', '¡Generación de la Memoria Técnica iniciada! La IA está creando el documento basándose en '.$tender->extractedCriteria->count().' criterios del PCA y '.$tender->extractedSpecifications->count().' especificaciones del PPT. Esto puede tardar unos minutos.');
     }
 
-    private function storeDocument(Tender $tender, $file, string $documentType): Document
+    private function storeDocument(Tender $tender, UploadedFile $file, string $documentType): Document
     {
         $originalFilename = $file->getClientOriginalName();
         $storedFilename = uniqid().'_'.$originalFilename;

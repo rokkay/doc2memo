@@ -29,7 +29,7 @@ class DocumentAnalyzer implements Agent, HasStructuredOutput
 
     public function __construct(string $documentType = 'pca')
     {
-        $this->definition = self::resolveDefinition($documentType);
+        $this->definition = $this->resolveDefinition($documentType);
     }
 
     public function instructions(): Stringable|string
@@ -59,7 +59,7 @@ class DocumentAnalyzer implements Agent, HasStructuredOutput
         return mb_strlen($content);
     }
 
-    private static function resolveDefinition(string $documentType): DocumentAnalyzerDefinition
+    private function resolveDefinition(string $documentType): DocumentAnalyzerDefinition
     {
         return match ($documentType) {
             'pca' => new PcaDocumentAnalyzerDefinition,

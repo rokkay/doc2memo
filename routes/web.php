@@ -5,9 +5,7 @@ use App\Http\Controllers\TechnicalMemoryController;
 use App\Http\Controllers\TenderController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return redirect()->route('tenders.index');
-});
+Route::get('/', fn () => to_route('tenders.index'));
 
 Route::resource('tenders', TenderController::class)
     ->only(['index', 'create', 'store', 'show']);
@@ -33,5 +31,5 @@ Route::get('technical-memories/{technicalMemory}/download', [TechnicalMemoryCont
 Route::get('technical-memories/{technicalMemory}/download-markdown', [TechnicalMemoryController::class, 'downloadMarkdown'])
     ->name('technical-memories.download-markdown');
 
-Route::get('technical-memories/operational-metrics', static fn () => view('technical-memories.operational-metrics'))
+Route::get('technical-memories/operational-metrics', static fn (): \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View => view('technical-memories.operational-metrics'))
     ->name('technical-memories.operational-metrics');

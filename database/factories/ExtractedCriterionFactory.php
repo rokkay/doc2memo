@@ -7,6 +7,9 @@ use App\Models\ExtractedCriterion;
 use App\Models\Tender;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/**
+ * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\ExtractedCriterion>
+ */
 class ExtractedCriterionFactory extends Factory
 {
     protected $model = ExtractedCriterion::class;
@@ -16,7 +19,7 @@ class ExtractedCriterionFactory extends Factory
         return [
             'tender_id' => Tender::factory(),
             'document_id' => Document::factory(),
-            'section_number' => fake()->optional()->regexify('[0-9]\.[0-9]'),
+            'section_number' => fake()->optional()->regexify('\d\.\d'),
             'section_title' => fake()->sentence(4),
             'description' => fake()->paragraph(),
             'priority' => fake()->randomElement(['mandatory', 'preferable', 'optional']),
