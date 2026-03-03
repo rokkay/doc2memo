@@ -9,7 +9,8 @@ Route::get('/', function () {
     return redirect()->route('tenders.index');
 });
 
-Route::resource('tenders', TenderController::class);
+Route::resource('tenders', TenderController::class)
+    ->only(['index', 'create', 'store', 'show']);
 
 Route::post('tenders/{tender}/analyze', [TenderController::class, 'analyze'])
     ->name('tenders.analyze');
