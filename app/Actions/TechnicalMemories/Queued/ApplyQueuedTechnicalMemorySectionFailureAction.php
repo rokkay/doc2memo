@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Actions\TechnicalMemories\Queued;
 
+use App\Actions\TechnicalMemories\GenerateTechnicalMemorySectionAction;
 use App\Data\TechnicalMemoryGenerationContextData;
 use App\Data\TechnicalMemorySectionData;
-use App\Jobs\GenerateTechnicalMemorySection;
 use Throwable;
 
 final class ApplyQueuedTechnicalMemorySectionFailureAction
@@ -23,7 +23,7 @@ final class ApplyQueuedTechnicalMemorySectionFailureAction
         string $runId,
         Throwable $exception,
     ): void {
-        $job = new GenerateTechnicalMemorySection(
+        $job = new GenerateTechnicalMemorySectionAction(
             technicalMemorySectionId: $technicalMemorySectionId,
             section: TechnicalMemorySectionData::fromArray($sectionPayload),
             context: TechnicalMemoryGenerationContextData::fromArray($contextPayload),

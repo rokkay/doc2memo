@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\TechnicalMemories\GenerateTechnicalMemorySectionAction;
 use App\Actions\TechnicalMemories\QueueGenerateTechnicalMemorySectionAction;
 use App\Ai\Agents\TechnicalMemoryDynamicSectionAgent;
 use App\Ai\Agents\TechnicalMemorySectionEditorAgent;
@@ -9,7 +10,6 @@ use App\Data\TechnicalMemoryGenerationContextData;
 use App\Data\TechnicalMemorySectionData;
 use App\Enums\AiCostCategory;
 use App\Enums\TechnicalMemorySectionStatus;
-use App\Jobs\GenerateTechnicalMemorySection;
 use App\Listeners\RecordAiUsageFromAgentPrompted;
 use App\Models\TechnicalMemory;
 use App\Models\TechnicalMemoryGenerationMetric;
@@ -18,7 +18,7 @@ use App\Models\TechnicalMemorySection;
 use App\Models\Tender;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Queue;
+use Laravel\Ai\QueuedAgentPrompt;
 
 use function Pest\Laravel\assertDatabaseHas;
 
@@ -60,7 +60,7 @@ it('generates a section and keeps memory in draft when pending sections remain',
         ['content' => $richMethodologyContent],
     ])->preventStrayPrompts();
 
-    new GenerateTechnicalMemorySection(
+    new GenerateTechnicalMemorySectionAction(
         technicalMemorySectionId: $section->id,
         section: TechnicalMemorySectionData::fromArray([
             'group_key' => '1.1-metodologia',
@@ -180,7 +180,7 @@ it('marks memory as generated when all dynamic sections finish', function (): vo
         ['content' => $richGovernanceContent],
     ])->preventStrayPrompts();
 
-    new GenerateTechnicalMemorySection(
+    new GenerateTechnicalMemorySectionAction(
         technicalMemorySectionId: $section->id,
         section: TechnicalMemorySectionData::fromArray([
             'group_key' => '2.1-gobierno',
@@ -208,7 +208,6 @@ it('marks memory as generated when all dynamic sections finish', function (): vo
 });
 
 it('retries once when generated section does not meet quality gate', function (): void {
-    Queue::fake();
 
     $tender = Tender::factory()->create();
 
@@ -232,7 +231,7 @@ it('retries once when generated section does not meet quality gate', function ()
         ['content' => '### Resumen breve\n\nTexto corto.'],
     ])->preventStrayPrompts();
 
-    new GenerateTechnicalMemorySection(
+    new GenerateTechnicalMemorySectionAction(
         technicalMemorySectionId: $section->id,
         section: TechnicalMemorySectionData::fromArray([
             'group_key' => '2.1-metodologia',
@@ -255,11 +254,10 @@ it('retries once when generated section does not meet quality gate', function ()
     expect($section?->status)->toBe(TechnicalMemorySectionStatus::Pending);
     expect($section?->error_message)->not->toBeNull();
 
-    Queue::assertPushed(GenerateTechnicalMemorySection::class, fn (GenerateTechnicalMemorySection $job): bool => $job->technicalMemorySectionId > 0
-        && $job->qualityAttempt === 1
-        && $job->context->qualityFeedback !== null
-        && is_string($job->context->runId)
-        && $job->context->runId !== '');
+    TechnicalMemoryDynamicSectionAgent::assertQueued(function (QueuedAgentPrompt $prompt): bool {
+        return $prompt->agent instanceof TechnicalMemoryDynamicSectionAgent
+            && str_contains($prompt->prompt, 'FEEDBACK DE CALIDAD');
+    });
 
     $metric = TechnicalMemoryGenerationMetric::query()
         ->where('technical_memory_id', $memory->id)
@@ -327,7 +325,7 @@ it('uses native queueing action for retries when configured', function (): void 
         ['content' => '### Resumen breve\n\nTexto corto.'],
     ])->preventStrayPrompts();
 
-    new GenerateTechnicalMemorySection(
+    new GenerateTechnicalMemorySectionAction(
         technicalMemorySectionId: $section->id,
         section: TechnicalMemorySectionData::fromArray([
             'group_key' => '2.1-metodologia',
@@ -377,7 +375,7 @@ it('persists skipped style editor ai entries and keeps total cost aligned', func
         ['content' => $richContent],
     ])->preventStrayPrompts();
 
-    new GenerateTechnicalMemorySection(
+    new GenerateTechnicalMemorySectionAction(
         technicalMemorySectionId: $section->id,
         section: TechnicalMemorySectionData::fromArray([
             'group_key' => '1.1-metodologia',
@@ -459,7 +457,7 @@ it('stores token usage metadata when sdk usage is available and keeps char fallb
         ['content' => $richContent],
     ])->preventStrayPrompts();
 
-    new GenerateTechnicalMemorySection(
+    new GenerateTechnicalMemorySectionAction(
         technicalMemorySectionId: $section->id,
         section: TechnicalMemorySectionData::fromArray([
             'group_key' => '1.1-metodologia',

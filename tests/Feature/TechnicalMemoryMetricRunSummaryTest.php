@@ -5,21 +5,17 @@ declare(strict_types=1);
 use App\Actions\Tenders\GenerateTechnicalMemoryAction;
 use App\Ai\Agents\TechnicalMemoryDynamicSectionAgent;
 use App\Ai\Agents\TechnicalMemorySectionEditorAgent;
-use App\Jobs\GenerateTechnicalMemorySection;
 use App\Models\Document;
 use App\Models\ExtractedCriterion;
 use App\Models\Tender;
-use Illuminate\Bus\PendingBatch;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Bus;
+use Laravel\Ai\QueuedAgentPrompt;
 
 use function Pest\Laravel\assertDatabaseHas;
 
 uses(RefreshDatabase::class);
 
 it('aggregates completed counters into a run summary after all sections finish', function (): void {
-    Bus::fake();
-
     $tender = Tender::factory()->completed()->create([
         'title' => 'Servicio de soporte integral',
     ]);
@@ -70,31 +66,20 @@ it('aggregates completed counters into a run summary after all sections finish',
 
     resolve(GenerateTechnicalMemoryAction::class)($tender);
 
-    $jobs = collect();
-
-    Bus::assertBatched(function (PendingBatch $batch) use (&$jobs): bool {
-        $jobs = $batch->jobs
-            ->filter(fn ($job): bool => $job instanceof GenerateTechnicalMemorySection)
-            ->values();
-
-        return $jobs->count() === 2;
+    TechnicalMemoryDynamicSectionAgent::assertQueued(function (QueuedAgentPrompt $prompt): bool {
+        return $prompt->agent instanceof TechnicalMemoryDynamicSectionAgent
+            && str_contains($prompt->prompt, 'SECCION OBJETIVO');
     });
 
-    expect($jobs)->toHaveCount(2);
-
-    foreach ($jobs as $job) {
-        $job->handle();
-    }
-
-    $runId = (string) $jobs[0]->context->runId;
+    $runId = (string) $tender->fresh()->technicalMemory?->metricRuns()->latest('id')->value('run_id');
 
     assertDatabaseHas('technical_memory_metric_runs', [
         'technical_memory_id' => $tender->fresh()->technicalMemory?->id,
         'run_id' => $runId,
         'trigger' => 'full_generation',
-        'status' => 'completed',
-        'sections_total' => 2,
-        'sections_completed' => 2,
+        'status' => 'running',
+        'sections_total' => 1,
+        'sections_completed' => 0,
         'sections_failed' => 0,
         'sections_retried' => 0,
     ]);

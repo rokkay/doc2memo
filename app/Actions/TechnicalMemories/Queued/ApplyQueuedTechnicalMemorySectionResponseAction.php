@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Actions\TechnicalMemories\Queued;
 
+use App\Actions\TechnicalMemories\GenerateTechnicalMemorySectionAction;
 use App\Ai\Agents\TechnicalMemoryDynamicSectionAgent;
 use App\Data\TechnicalMemoryGenerationContextData;
 use App\Data\TechnicalMemorySectionData;
-use App\Jobs\GenerateTechnicalMemorySection;
 use Laravel\Ai\Responses\AgentResponse;
 use Throwable;
 
@@ -33,7 +33,7 @@ final class ApplyQueuedTechnicalMemorySectionResponseAction
             context: $context->toArray(),
         ))->extractContent($response);
 
-        $job = new GenerateTechnicalMemorySection(
+        $job = new GenerateTechnicalMemorySectionAction(
             technicalMemorySectionId: $technicalMemorySectionId,
             section: $section,
             context: $context,
