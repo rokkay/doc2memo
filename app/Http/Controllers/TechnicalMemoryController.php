@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\TechnicalMemory;
+use App\Models\TechnicalMemorySection;
 use App\Models\Tender;
 use App\Support\SectionTitleNormalizer;
 use App\Support\TechnicalMemoryMarkdownBuilder;
@@ -18,7 +19,7 @@ class TechnicalMemoryController extends Controller
 {
     public function show(Tender $tender): View
     {
-        return view('technical-memories.show', compact('tender'));
+        return view('technical-memories.show', ['tender' => $tender]);
     }
 
     public function download(TechnicalMemory $technicalMemory): PdfBuilder
@@ -27,7 +28,7 @@ class TechnicalMemoryController extends Controller
         $technicalMemory->loadMissing('sections');
 
         $rawSections = $technicalMemory->sections
-            ->map(function ($section): ?array {
+            ->map(function (TechnicalMemorySection $section): ?array {
                 $content = trim((string) ($section->content ?? ''));
 
                 if ($content === '') {
@@ -86,8 +87,8 @@ class TechnicalMemoryController extends Controller
 
             foreach ($subsections as $subsection) {
                 $toc[] = [
-                    'id' => (string) $subsection['id'],
-                    'title' => (string) $subsection['title'],
+                    'id' => $subsection['id'],
+                    'title' => $subsection['title'],
                     'level' => 2,
                 ];
             }

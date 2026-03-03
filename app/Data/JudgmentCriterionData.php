@@ -6,23 +6,23 @@ namespace App\Data;
 
 use App\Models\ExtractedCriterion;
 
-final class JudgmentCriterionData
+final readonly class JudgmentCriterionData
 {
     /**
      * @param  array<string,mixed>|null  $metadata
      */
     public function __construct(
-        public readonly ?string $sectionNumber,
-        public readonly string $sectionTitle,
-        public readonly string $description,
-        public readonly string $priority,
-        public readonly string $criterionType,
-        public readonly ?float $scorePoints,
-        public readonly string $groupKey,
-        public readonly string $source,
-        public readonly ?float $confidence,
-        public readonly ?string $sourceReference,
-        public readonly ?array $metadata,
+        public ?string $sectionNumber,
+        public string $sectionTitle,
+        public string $description,
+        public string $priority,
+        public string $criterionType,
+        public ?float $scorePoints,
+        public string $groupKey,
+        public string $source,
+        public ?float $confidence,
+        public ?string $sourceReference,
+        public ?array $metadata,
     ) {}
 
     public static function fromModel(ExtractedCriterion $criterion): self

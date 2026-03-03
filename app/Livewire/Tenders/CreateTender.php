@@ -96,7 +96,7 @@ class CreateTender extends Component
 
         try {
             $createdTender = DB::transaction(function (): Tender {
-                $tender = Tender::create([
+                $tender = Tender::query()->create([
                     'title' => $this->form->title,
                     'issuing_company' => $this->form->issuing_company,
                     'reference_number' => $this->form->reference_number,
@@ -132,7 +132,7 @@ class CreateTender extends Component
         $storedFilename = uniqid().'_'.$originalFilename;
         $path = $file->storeAs("documents/{$tender->id}", $storedFilename, 'local');
 
-        Document::create([
+        Document::query()->create([
             'tender_id' => $tender->id,
             'document_type' => $documentType,
             'original_filename' => $originalFilename,

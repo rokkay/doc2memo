@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 namespace App\Data;
 
-final class TechnicalMemoryGenerationContextData
+final readonly class TechnicalMemoryGenerationContextData
 {
     /**
      * @param  array<string,mixed>  $pca
      * @param  array<string,mixed>  $ppt
      */
     public function __construct(
-        public readonly array $pca,
-        public readonly array $ppt,
-        public readonly string $memoryTitle,
-        public readonly ?string $qualityFeedback = null,
-        public readonly ?string $runId = null,
+        public array $pca,
+        public array $ppt,
+        public string $memoryTitle,
+        public ?string $qualityFeedback = null,
+        public ?string $runId = null,
     ) {}
 
     /**

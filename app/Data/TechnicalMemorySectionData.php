@@ -4,19 +4,19 @@ declare(strict_types=1);
 
 namespace App\Data;
 
-final class TechnicalMemorySectionData
+final readonly class TechnicalMemorySectionData
 {
     /**
      * @param  array<int,JudgmentCriterionData>  $criteria
      */
     public function __construct(
-        public readonly string $groupKey,
-        public readonly ?string $sectionNumber,
-        public readonly string $sectionTitle,
-        public readonly float $totalPoints,
-        public readonly int $criteriaCount,
-        public readonly array $criteria,
-        public readonly string $sortKey,
+        public string $groupKey,
+        public ?string $sectionNumber,
+        public string $sectionTitle,
+        public float $totalPoints,
+        public int $criteriaCount,
+        public array $criteria,
+        public string $sortKey,
     ) {}
 
     /**

@@ -6,13 +6,13 @@ namespace App\Support;
 
 final class TechnicalMemoryMetrics
 {
-    public const EVENT_STARTED = 'started';
+    public const string EVENT_STARTED = 'started';
 
-    public const EVENT_QUALITY_FAILED = 'quality_failed';
+    public const string EVENT_QUALITY_FAILED = 'quality_failed';
 
-    public const EVENT_COMPLETED = 'completed';
+    public const string EVENT_COMPLETED = 'completed';
 
-    public const EVENT_FAILED = 'failed';
+    public const string EVENT_FAILED = 'failed';
 
-    public const EVENT_REQUEUED = 'requeued';
+    public const string EVENT_REQUEUED = 'requeued';
 }

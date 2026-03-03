@@ -129,14 +129,14 @@ class TenderDetail extends Component
             'total_count' => $sections->count(),
             'generating_titles' => $generatingSections
                 ->pluck('section_title')
-                ->map(fn ($title): string => trim((string) $title))
+                ->map(fn (mixed $title): string => trim((string) $title))
                 ->filter()
                 ->values()
                 ->take(3)
                 ->all(),
             'pending_titles' => $pendingSections
                 ->pluck('section_title')
-                ->map(fn ($title): string => trim((string) $title))
+                ->map(fn (mixed $title): string => trim((string) $title))
                 ->filter()
                 ->values()
                 ->take(3)

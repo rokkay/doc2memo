@@ -40,12 +40,14 @@ class ExtractedCriterion extends Model
         ];
     }
 
-    public function scopeJudgment(Builder $query): Builder
+    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    protected function judgment(Builder $query): Builder
     {
         return $query->where('criterion_type', 'judgment');
     }
 
-    public function scopeAutomatic(Builder $query): Builder
+    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    protected function automatic(Builder $query): Builder
     {
         return $query->where('criterion_type', 'automatic');
     }

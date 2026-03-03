@@ -67,12 +67,10 @@ it('resets and requeues a single section regeneration', function (): void {
     expect($memory?->status)->toBe('draft');
     expect($memory?->generated_at)->toBeNull();
 
-    Queue::assertPushed(GenerateTechnicalMemorySection::class, function (GenerateTechnicalMemorySection $job) use ($section): bool {
-        return $job->technicalMemorySectionId === $section?->id
-            && $job->runId !== ''
-            && is_string($job->context->runId)
-            && $job->context->runId === $job->runId;
-    });
+    Queue::assertPushed(GenerateTechnicalMemorySection::class, fn (GenerateTechnicalMemorySection $job): bool => $job->technicalMemorySectionId === $section?->id
+        && $job->runId !== ''
+        && is_string($job->context->runId)
+        && $job->context->runId === $job->runId);
 
     expect($memory?->metricRuns()->latest('id')->value('run_id'))->not->toBe($existingRunId);
 });

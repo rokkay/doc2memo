@@ -64,7 +64,7 @@ it('processes a pca markdown document and stores extracted data', function (): v
         ],
     ])->preventStrayPrompts();
 
-    (new ProcessDocument($document))->handle();
+    new ProcessDocument($document)->handle();
 
     $processedDocument = $document->fresh();
 
@@ -134,7 +134,7 @@ it('stores textual deadline date extracted by ai', function (): void {
         ],
     ])->preventStrayPrompts();
 
-    (new ProcessDocument($document))->handle();
+    new ProcessDocument($document)->handle();
 
     $processedDocument = $document->fresh();
 
@@ -180,7 +180,7 @@ it('analyzes large documents in a single full-document pass', function (): void 
         ],
     ])->preventStrayPrompts();
 
-    (new ProcessDocument($document))->handle();
+    new ProcessDocument($document)->handle();
 
     expect($document->fresh()->status)->toBe('analyzed');
     expect($document->fresh()->extractedCriteria()->count())->toBe(1);
@@ -221,7 +221,7 @@ it('stores textual deadline without relying on model date casts', function (): v
         ],
     ])->preventStrayPrompts();
 
-    (new ProcessDocument($document))->handle();
+    new ProcessDocument($document)->handle();
 
     $storedDeadline = DB::table('tenders')->where('id', $tender->id)->value('deadline_date');
 
@@ -312,7 +312,7 @@ it('delegates document analysis and keeps persisted analysis cost breakdown keys
 
     app()->instance(AnalyzeDocumentWithMetricsAction::class, $delegate);
 
-    (new ProcessDocument($document))->handle();
+    new ProcessDocument($document)->handle();
 
     $processedDocument = $document->fresh();
 
@@ -357,7 +357,7 @@ it('stores analyzer token usage metadata and char fallback for document analysis
         ],
     ])->preventStrayPrompts();
 
-    (new ProcessDocument($document))->handle();
+    new ProcessDocument($document)->handle();
 
     $analyzerEntry = DB::table('ai_cost_entries')
         ->where('document_id', $document->id)

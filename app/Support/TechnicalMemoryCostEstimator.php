@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support;
 
-final class TechnicalMemoryCostEstimator
+final readonly class TechnicalMemoryCostEstimator
 {
     private AiCostEstimator $estimator;
 

@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Actions\Tenders\AnalyzeTenderDocumentsAction;
-use App\Jobs\ProcessDocument;
 use App\Models\Document;
 use App\Models\Tender;
 
@@ -31,7 +30,7 @@ class DocumentAnalysisService
             'processing_error' => null,
         ]);
 
-        ProcessDocument::dispatch($document);
+        dispatch(new \App\Jobs\ProcessDocument($document));
         $tender->update(['status' => 'analyzing']);
     }
 }

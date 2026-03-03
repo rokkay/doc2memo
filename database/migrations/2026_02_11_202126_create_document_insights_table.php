@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('document_insights', function (Blueprint $table) {
+        Schema::create('document_insights', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tender_id')->constrained()->cascadeOnDelete();
             $table->foreignId('document_id')->constrained()->cascadeOnDelete();

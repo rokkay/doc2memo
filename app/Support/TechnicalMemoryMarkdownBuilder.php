@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\TechnicalMemory;
+use App\Models\TechnicalMemorySection;
 
 class TechnicalMemoryMarkdownBuilder
 {
@@ -16,7 +17,7 @@ class TechnicalMemoryMarkdownBuilder
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get()
-            ->map(function ($section): string {
+            ->map(function (TechnicalMemorySection $section): string {
                 $heading = SectionTitleNormalizer::heading($section->section_number, (string) $section->section_title);
 
                 return '## '.$heading."\n\n".trim((string) $section->content);

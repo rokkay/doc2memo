@@ -151,10 +151,8 @@ it('can regenerate existing technical memory and reset sections', function (): v
         ->call('generateMemory')
         ->assertDispatched('memory-generated');
 
-    Bus::assertBatched(function (PendingBatch $batch): bool {
-        return $batch->jobs->count() === 1
-            && $batch->jobs->first() instanceof GenerateTechnicalMemorySection;
-    });
+    Bus::assertBatched(fn (PendingBatch $batch): bool => $batch->jobs->count() === 1
+        && $batch->jobs->first() instanceof GenerateTechnicalMemorySection);
 
     $memory = $memory->fresh();
 
@@ -272,10 +270,8 @@ it('queues technical memory generation when analysis is complete', function (): 
         ->assertSee('Ver progreso de la memoria')
         ->assertSee(route('technical-memories.show', $tender));
 
-    Bus::assertBatched(function (PendingBatch $batch): bool {
-        return $batch->jobs->count() === 1
-            && $batch->jobs->first() instanceof GenerateTechnicalMemorySection;
-    });
+    Bus::assertBatched(fn (PendingBatch $batch): bool => $batch->jobs->count() === 1
+        && $batch->jobs->first() instanceof GenerateTechnicalMemorySection);
 
     expect($tender->fresh()->technicalMemory)->not->toBeNull();
     expect($tender->fresh()->technicalMemory->status)->toBe('draft');
