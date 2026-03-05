@@ -37,6 +37,7 @@ it('aggregates completed counters into a run summary after all sections finish',
         'description' => 'Criterio metodológico sin subapartados.',
         'group_key' => '1.1-metodologia',
         'criterion_type' => 'judgment',
+        'source' => 'analyzer',
         'score_points' => 16,
     ]);
 
@@ -48,6 +49,7 @@ it('aggregates completed counters into a run summary after all sections finish',
         'description' => 'Criterio de gobierno sin subapartados.',
         'group_key' => '2.1-gobierno',
         'criterion_type' => 'judgment',
+        'source' => 'analyzer',
         'score_points' => 12,
     ]);
 

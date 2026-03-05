@@ -18,6 +18,8 @@ uses()->group('livewire');
 uses(RefreshDatabase::class);
 
 it('renders kpi cards and metrics tables with unified ai costs', function (): void {
+    $baseTimestamp = CarbonImmutable::today()->subDay()->setTime(10, 0);
+
     $tender = Tender::factory()->create();
     $memory = TechnicalMemory::factory()->create([
         'tender_id' => $tender->id,
@@ -39,8 +41,8 @@ it('renders kpi cards and metrics tables with unified ai costs', function (): vo
         'duration_ms' => 1600,
         'output_chars' => 600,
         'model_name' => 'gpt-5-mini',
-        'created_at' => CarbonImmutable::parse('2026-02-12 10:00:00'),
-        'updated_at' => CarbonImmutable::parse('2026-02-12 10:00:00'),
+        'created_at' => $baseTimestamp,
+        'updated_at' => $baseTimestamp,
     ]);
 
     $metricB = TechnicalMemoryGenerationMetric::query()->forceCreate([
@@ -54,22 +56,22 @@ it('renders kpi cards and metrics tables with unified ai costs', function (): vo
         'duration_ms' => 2100,
         'output_chars' => 1900,
         'model_name' => 'gpt-5-mini',
-        'created_at' => CarbonImmutable::parse('2026-02-12 10:05:00'),
-        'updated_at' => CarbonImmutable::parse('2026-02-12 10:05:00'),
+        'created_at' => $baseTimestamp->addMinutes(5),
+        'updated_at' => $baseTimestamp->addMinutes(5),
     ]);
 
     $document = Document::factory()->create([
         'tender_id' => $tender->id,
         'document_type' => 'pca',
         'status' => 'analyzed',
-        'analyzed_at' => CarbonImmutable::parse('2026-02-12 10:06:00'),
+        'analyzed_at' => $baseTimestamp->addMinutes(6),
     ]);
 
     foreach ([
-        [$metricA, AiCostCategory::DynamicSection, 'dynamic_section', 0.15, '2026-02-12 10:00:00'],
-        [$metricA, AiCostCategory::StyleEditor, 'style_editor', 0.05, '2026-02-12 10:00:01'],
-        [$metricB, AiCostCategory::DynamicSection, 'dynamic_section', 0.19, '2026-02-12 10:05:00'],
-        [$metricB, AiCostCategory::StyleEditor, 'style_editor', 0.06, '2026-02-12 10:05:01'],
+        [$metricA, AiCostCategory::DynamicSection, 'dynamic_section', 0.15, $baseTimestamp],
+        [$metricA, AiCostCategory::StyleEditor, 'style_editor', 0.05, $baseTimestamp->addSecond()],
+        [$metricB, AiCostCategory::DynamicSection, 'dynamic_section', 0.19, $baseTimestamp->addMinutes(5)],
+        [$metricB, AiCostCategory::StyleEditor, 'style_editor', 0.06, $baseTimestamp->addMinutes(5)->addSecond()],
     ] as [$metric, $category, $agentKey, $costUsd, $createdAt]) {
         AiCostEntry::query()->forceCreate([
             'tender_id' => $tender->id,
@@ -85,8 +87,8 @@ it('renders kpi cards and metrics tables with unified ai costs', function (): vo
             'estimated_input_units' => 0.001,
             'estimated_output_units' => 0.001,
             'estimated_cost_usd' => $costUsd,
-            'created_at' => CarbonImmutable::parse($createdAt),
-            'updated_at' => CarbonImmutable::parse($createdAt),
+            'created_at' => $createdAt,
+            'updated_at' => $createdAt,
         ]);
     }
 
@@ -100,8 +102,8 @@ it('renders kpi cards and metrics tables with unified ai costs', function (): vo
         'estimated_input_units' => 0.001,
         'estimated_output_units' => 0.001,
         'estimated_cost_usd' => 0.06,
-        'created_at' => CarbonImmutable::parse('2026-02-12 10:06:00'),
-        'updated_at' => CarbonImmutable::parse('2026-02-12 10:06:00'),
+        'created_at' => $baseTimestamp->addMinutes(6),
+        'updated_at' => $baseTimestamp->addMinutes(6),
     ]);
 
     AiCostEntry::query()->forceCreate([
@@ -114,8 +116,8 @@ it('renders kpi cards and metrics tables with unified ai costs', function (): vo
         'estimated_input_units' => 0.001,
         'estimated_output_units' => 0.001,
         'estimated_cost_usd' => 0.03,
-        'created_at' => CarbonImmutable::parse('2026-02-12 10:06:01'),
-        'updated_at' => CarbonImmutable::parse('2026-02-12 10:06:01'),
+        'created_at' => $baseTimestamp->addMinutes(6)->addSecond(),
+        'updated_at' => $baseTimestamp->addMinutes(6)->addSecond(),
     ]);
 
     Livewire::test(OperationalMetrics::class)
@@ -132,6 +134,9 @@ it('renders kpi cards and metrics tables with unified ai costs', function (): vo
 });
 
 it('updates kpis when date filters change', function (): void {
+    $dayOneTimestamp = CarbonImmutable::today()->subDays(2)->setTime(10, 0);
+    $dayTwoTimestamp = CarbonImmutable::today()->subDay()->setTime(10, 0);
+
     $tender = Tender::factory()->create();
     $memory = TechnicalMemory::factory()->create([
         'tender_id' => $tender->id,
@@ -151,8 +156,8 @@ it('updates kpis when date filters change', function (): void {
         'duration_ms' => 1100,
         'output_chars' => 1850,
         'model_name' => 'gpt-5-mini',
-        'created_at' => CarbonImmutable::parse('2026-02-12 10:00:00'),
-        'updated_at' => CarbonImmutable::parse('2026-02-12 10:00:00'),
+        'created_at' => $dayOneTimestamp,
+        'updated_at' => $dayOneTimestamp,
     ]);
 
     $metricB = TechnicalMemoryGenerationMetric::query()->forceCreate([
@@ -166,22 +171,22 @@ it('updates kpis when date filters change', function (): void {
         'duration_ms' => 900,
         'output_chars' => 1700,
         'model_name' => 'gpt-5-mini',
-        'created_at' => CarbonImmutable::parse('2026-02-13 10:00:00'),
-        'updated_at' => CarbonImmutable::parse('2026-02-13 10:00:00'),
+        'created_at' => $dayTwoTimestamp,
+        'updated_at' => $dayTwoTimestamp,
     ]);
 
     $document = Document::factory()->create([
         'tender_id' => $tender->id,
         'document_type' => 'pca',
         'status' => 'analyzed',
-        'analyzed_at' => CarbonImmutable::parse('2026-02-13 10:30:00'),
+        'analyzed_at' => $dayTwoTimestamp->addMinutes(30),
     ]);
 
     foreach ([
-        [$metricA, AiCostCategory::DynamicSection, 'dynamic_section', 0.08, '2026-02-12 10:00:00'],
-        [$metricA, AiCostCategory::StyleEditor, 'style_editor', 0.03, '2026-02-12 10:00:01'],
-        [$metricB, AiCostCategory::DynamicSection, 'dynamic_section', 0.16, '2026-02-13 10:00:00'],
-        [$metricB, AiCostCategory::StyleEditor, 'style_editor', 0.06, '2026-02-13 10:00:01'],
+        [$metricA, AiCostCategory::DynamicSection, 'dynamic_section', 0.08, $dayOneTimestamp],
+        [$metricA, AiCostCategory::StyleEditor, 'style_editor', 0.03, $dayOneTimestamp->addSecond()],
+        [$metricB, AiCostCategory::DynamicSection, 'dynamic_section', 0.16, $dayTwoTimestamp],
+        [$metricB, AiCostCategory::StyleEditor, 'style_editor', 0.06, $dayTwoTimestamp->addSecond()],
     ] as [$metric, $category, $agentKey, $costUsd, $createdAt]) {
         AiCostEntry::query()->forceCreate([
             'tender_id' => $tender->id,
@@ -197,8 +202,8 @@ it('updates kpis when date filters change', function (): void {
             'estimated_input_units' => 0.001,
             'estimated_output_units' => 0.001,
             'estimated_cost_usd' => $costUsd,
-            'created_at' => CarbonImmutable::parse($createdAt),
-            'updated_at' => CarbonImmutable::parse($createdAt),
+            'created_at' => $createdAt,
+            'updated_at' => $createdAt,
         ]);
     }
 
@@ -212,8 +217,8 @@ it('updates kpis when date filters change', function (): void {
         'estimated_input_units' => 0.001,
         'estimated_output_units' => 0.001,
         'estimated_cost_usd' => 0.13,
-        'created_at' => CarbonImmutable::parse('2026-02-13 10:30:00'),
-        'updated_at' => CarbonImmutable::parse('2026-02-13 10:30:00'),
+        'created_at' => $dayTwoTimestamp->addMinutes(30),
+        'updated_at' => $dayTwoTimestamp->addMinutes(30),
     ]);
 
     AiCostEntry::query()->forceCreate([
@@ -226,14 +231,14 @@ it('updates kpis when date filters change', function (): void {
         'estimated_input_units' => 0.001,
         'estimated_output_units' => 0.001,
         'estimated_cost_usd' => 0.05,
-        'created_at' => CarbonImmutable::parse('2026-02-13 10:30:01'),
-        'updated_at' => CarbonImmutable::parse('2026-02-13 10:30:01'),
+        'created_at' => $dayTwoTimestamp->addMinutes(30)->addSecond(),
+        'updated_at' => $dayTwoTimestamp->addMinutes(30)->addSecond(),
     ]);
 
     Livewire::test(OperationalMetrics::class)
         ->assertSet('metrics.global.attempts', 2)
-        ->set('from_date', '2026-02-13')
-        ->set('to_date', '2026-02-13')
+        ->set('from_date', $dayTwoTimestamp->toDateString())
+        ->set('to_date', $dayTwoTimestamp->toDateString())
         ->assertSet('metrics.global.attempts', 1)
         ->assertSet('metrics.global.estimated_total_ai_cost_usd', 0.4)
         ->assertSet('metrics.global.estimated_cost_usd', 0.22)
