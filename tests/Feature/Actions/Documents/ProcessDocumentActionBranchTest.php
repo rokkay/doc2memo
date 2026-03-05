@@ -3,7 +3,10 @@
 declare(strict_types=1);
 
 use App\Actions\Documents\AnalyzeDocumentWithMetricsAction;
+use App\Actions\Documents\ExtractDocumentTextAction;
+use App\Actions\Documents\PersistPcaExtractionAction;
 use App\Actions\Documents\ProcessDocumentAction;
+use App\Actions\Documents\RefreshTenderStatusAction;
 use App\Models\Document;
 use App\Models\Tender;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -116,7 +119,7 @@ it('marks tender analyzing when at least one document remains not analyzed', fun
     expect($tender->fresh()->status)->toBe('analyzing');
 });
 
-it('extracts text through pdf parser branch and covers helper branches via reflection', function (): void {
+it('extracts text through pdf parser branch and covers criterion normalization helpers', function (): void {
     Storage::fake('local');
 
     $tender = Tender::factory()->create();
@@ -134,36 +137,39 @@ it('extracts text through pdf parser branch and covers helper branches via refle
     $parser = \Mockery::mock('overload:Smalot\\PdfParser\\Parser');
     $parser->shouldReceive('parseFile')->once()->andReturn($fakePdf);
 
-    $action = new ProcessDocumentAction;
+    $extractText = new ExtractDocumentTextAction;
 
-    $extractText = new ReflectionMethod(ProcessDocumentAction::class, 'extractText');
+    expect($extractText($document))->toBe('pdf text');
 
-    expect($extractText->invoke($action, $document))->toBe('pdf text');
+    $pcaExtraction = new PersistPcaExtractionAction;
+    $resolveSourceReference = new ReflectionMethod(PersistPcaExtractionAction::class, 'resolveSourceReference');
 
-    $resolveSourceReference = new ReflectionMethod(ProcessDocumentAction::class, 'resolveSourceReference');
+    expect($resolveSourceReference->invoke($pcaExtraction, '1.2', 'Titulo', ['source_reference' => 'Ref']))->toBe('Ref')
+        ->and($resolveSourceReference->invoke($pcaExtraction, '2.1', 'Seccion', []))->toBe('2.1 Seccion')
+        ->and($resolveSourceReference->invoke($pcaExtraction, '2.1', '', []))->toBe('2.1')
+        ->and($resolveSourceReference->invoke($pcaExtraction, null, 'Titulo', []))->toBe('Titulo')
+        ->and($resolveSourceReference->invoke($pcaExtraction, null, '', []))->toBeNull();
 
-    expect($resolveSourceReference->invoke($action, '1.2', 'Titulo', ['source_reference' => 'Ref']))->toBe('Ref')
-        ->and($resolveSourceReference->invoke($action, '2.1', 'Seccion', []))->toBe('2.1 Seccion')
-        ->and($resolveSourceReference->invoke($action, '2.1', '', []))->toBe('2.1')
-        ->and($resolveSourceReference->invoke($action, null, '', []))->toBeNull();
+    $extractScorePoints = new ReflectionMethod(PersistPcaExtractionAction::class, 'extractScorePoints');
 
-    $extractScorePoints = new ReflectionMethod(ProcessDocumentAction::class, 'extractScorePoints');
+    expect($extractScorePoints->invoke($pcaExtraction, null, 'hasta 12,5 puntos', []))->toBe(12.5)
+        ->and($extractScorePoints->invoke($pcaExtraction, null, 'sin puntos', ['max_points' => '8']))->toBe(8.0)
+        ->and($extractScorePoints->invoke($pcaExtraction, null, 'sin valor', []))->toBeNull();
 
-    expect($extractScorePoints->invoke($action, null, 'hasta 12,5 puntos', []))->toBe(12.5)
-        ->and($extractScorePoints->invoke($action, null, 'sin puntos', ['max_points' => '8']))->toBe(8.0)
-        ->and($extractScorePoints->invoke($action, null, 'sin valor', []))->toBeNull();
+    $normalizeCriterionType = new ReflectionMethod(PersistPcaExtractionAction::class, 'normalizeCriterionType');
 
-    $normalizeCriterionType = new ReflectionMethod(ProcessDocumentAction::class, 'normalizeCriterionType');
+    expect($normalizeCriterionType->invoke($pcaExtraction, 'unknown', 'Juicio de valor', 'texto'))->toBe('judgment')
+        ->and($normalizeCriterionType->invoke($pcaExtraction, 'unknown', 'Precio por hora', 'texto'))->toBe('automatic')
+        ->and($normalizeCriterionType->invoke($pcaExtraction, 'automatic', 'titulo', 'detalle'))->toBe('automatic')
+        ->and($normalizeCriterionType->invoke($pcaExtraction, 'unknown', 'titulo', 'detalle'))->toBe('judgment');
 
-    expect($normalizeCriterionType->invoke($action, 'unknown', 'Juicio de valor', 'texto'))->toBe('judgment')
-        ->and($normalizeCriterionType->invoke($action, 'unknown', 'Precio por hora', 'texto'))->toBe('automatic')
-        ->and($normalizeCriterionType->invoke($action, 'automatic', 'titulo', 'detalle'))->toBe('automatic')
-        ->and($normalizeCriterionType->invoke($action, 'unknown', 'titulo', 'detalle'))->toBe('judgment');
+    $parseNumericValue = new ReflectionMethod(PersistPcaExtractionAction::class, 'parseNumericValue');
 
-    $parseNumericValue = new ReflectionMethod(ProcessDocumentAction::class, 'parseNumericValue');
-
-    expect($parseNumericValue->invoke($action, ''))->toBeNull()
-        ->and($parseNumericValue->invoke($action, 'abc'))->toBeNull();
+    expect($parseNumericValue->invoke($pcaExtraction, 5))->toBe(5.0)
+        ->and($parseNumericValue->invoke($pcaExtraction, 5.25))->toBe(5.25)
+        ->and($parseNumericValue->invoke($pcaExtraction, []))->toBeNull()
+        ->and($parseNumericValue->invoke($pcaExtraction, ''))->toBeNull()
+        ->and($parseNumericValue->invoke($pcaExtraction, 'abc'))->toBeNull();
 });
 
 it('returns early when tender cannot be resolved while refreshing status', function (): void {
@@ -174,8 +180,9 @@ it('returns early when tender cannot be resolved while refreshing status', funct
 
     $tender->delete();
 
-    $action = new ProcessDocumentAction;
-    $refreshTenderStatus = new ReflectionMethod(ProcessDocumentAction::class, 'refreshTenderStatus');
+    $action = new RefreshTenderStatusAction;
 
-    expect($refreshTenderStatus->invoke($action, $document))->toBeNull();
+    expect(function () use ($action, $document): void {
+        $action($document);
+    })->not->toThrow(Throwable::class);
 });
