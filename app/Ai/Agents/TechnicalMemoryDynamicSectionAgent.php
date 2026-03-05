@@ -56,14 +56,7 @@ INSTRUCTIONS;
     public function generate(): string
     {
         $response = $this->prompt($this->promptText());
-
-        $content = '';
-
-        if (is_array($response)) {
-            $content = (string) ($response['content'] ?? '');
-        } elseif ($response instanceof \ArrayAccess) {
-            $content = (string) ($response['content'] ?? '');
-        }
+        $content = (string) ($response['content'] ?? '');
 
         $sanitized = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $content);
 

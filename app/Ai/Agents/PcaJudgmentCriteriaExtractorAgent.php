@@ -60,18 +60,11 @@ INSTRUCTIONS;
     public function extract(string $content): array
     {
         $response = $this->prompt($content);
+        $criteria = $response instanceof \ArrayAccess
+            ? ($response['criteria'] ?? [])
+            : [];
 
-        if (is_array($response)) {
-            return is_array($response['criteria'] ?? null) ? $response['criteria'] : [];
-        }
-
-        if ($response instanceof \ArrayAccess) {
-            $criteria = $response['criteria'] ?? [];
-
-            return is_array($criteria) ? $criteria : [];
-        }
-
-        return [];
+        return is_array($criteria) ? $criteria : [];
     }
 
     public function modelName(): string
