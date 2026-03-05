@@ -32,8 +32,8 @@ final class RecordAiUsageFromAgentPrompted
     public static function recordUsageForAgent(string $agentClass, array $usage): void
     {
         self::$usageByAgent[$agentClass] = [
-            'prompt_tokens' => max(0, (int) ($usage['prompt_tokens'] ?? 0)),
-            'completion_tokens' => max(0, (int) ($usage['completion_tokens'] ?? 0)),
+            'prompt_tokens' => max(0, (int) $usage['prompt_tokens']),
+            'completion_tokens' => max(0, (int) $usage['completion_tokens']),
             'cache_write_input_tokens' => max(0, (int) ($usage['cache_write_input_tokens'] ?? 0)),
             'cache_read_input_tokens' => max(0, (int) ($usage['cache_read_input_tokens'] ?? 0)),
             'reasoning_tokens' => max(0, (int) ($usage['reasoning_tokens'] ?? 0)),

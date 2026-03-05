@@ -50,9 +50,10 @@ class ShowMemory extends Component
      */
     private function preferredJudgmentCriteria(): Collection
     {
-        $judgmentCriteria = $this->tender->extractedCriteria
+        $judgmentCriteria = $this->tender->extractedCriteria()
             ->where('criterion_type', 'judgment')
-            ->values();
+            ->orderBy('id')
+            ->get();
 
         $dedicatedCriteria = $judgmentCriteria
             ->where('source', 'dedicated_extractor')

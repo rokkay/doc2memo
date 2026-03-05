@@ -8,6 +8,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property int $id
+ * @property int $technical_memory_id
+ * @property string|null $section_number
+ * @property string|null $section_title
+ * @property string|TechnicalMemorySectionStatus $status
+ */
 class TechnicalMemorySection extends Model
 {
     /** @use HasFactory<\Database\Factories\TechnicalMemorySectionFactory> */
@@ -38,17 +45,26 @@ class TechnicalMemorySection extends Model
         ];
     }
 
+    /**
+     * @return BelongsTo<TechnicalMemory, $this>
+     */
     public function technicalMemory(): BelongsTo
     {
         return $this->belongsTo(TechnicalMemory::class);
     }
 
+    /**
+     * @return HasMany<TechnicalMemoryMetricEvent, $this>
+     */
     public function metricEvents(): HasMany
     {
         return $this->hasMany(TechnicalMemoryMetricEvent::class)
             ->latest('id');
     }
 
+    /**
+     * @return HasMany<TechnicalMemoryGenerationMetric, $this>
+     */
     public function generationMetrics(): HasMany
     {
         return $this->hasMany(TechnicalMemoryGenerationMetric::class)
