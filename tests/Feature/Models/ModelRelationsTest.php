@@ -36,7 +36,8 @@ it('exposes expected technical memory relations', function (): void {
         ->and($memory->sections())->toBeInstanceOf(HasMany::class)
         ->and($memory->metricRuns())->toBeInstanceOf(HasMany::class)
         ->and($memory->metricEvents())->toBeInstanceOf(HasMany::class)
-        ->and($memory->generationMetrics())->toBeInstanceOf(HasMany::class);
+        ->and($memory->generationMetrics())->toBeInstanceOf(HasMany::class)
+        ->and($memory->aiCostEntries())->toBeInstanceOf(HasMany::class);
 });
 
 it('exposes expected metric and insight relations', function (): void {

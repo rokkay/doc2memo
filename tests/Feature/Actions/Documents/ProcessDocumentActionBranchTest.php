@@ -165,3 +165,17 @@ it('extracts text through pdf parser branch and covers helper branches via refle
     expect($parseNumericValue->invoke($action, ''))->toBeNull()
         ->and($parseNumericValue->invoke($action, 'abc'))->toBeNull();
 });
+
+it('returns early when tender cannot be resolved while refreshing status', function (): void {
+    $tender = Tender::factory()->create();
+    $document = Document::factory()->create([
+        'tender_id' => $tender->id,
+    ]);
+
+    $tender->delete();
+
+    $action = new ProcessDocumentAction;
+    $refreshTenderStatus = new ReflectionMethod(ProcessDocumentAction::class, 'refreshTenderStatus');
+
+    expect($refreshTenderStatus->invoke($action, $document))->toBeNull();
+});
