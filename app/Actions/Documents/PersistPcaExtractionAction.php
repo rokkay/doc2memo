@@ -10,14 +10,9 @@ use App\Models\ExtractedCriterion;
 use App\Support\JudgmentCriteriaParser;
 use Illuminate\Support\Str;
 
-final class PersistPcaExtractionAction
+final readonly class PersistPcaExtractionAction
 {
-    private JudgmentCriteriaParser $judgmentCriteriaParser;
-
-    public function __construct(?JudgmentCriteriaParser $judgmentCriteriaParser = null)
-    {
-        $this->judgmentCriteriaParser = $judgmentCriteriaParser ?? new JudgmentCriteriaParser;
-    }
+    public function __construct(private ?JudgmentCriteriaParser $judgmentCriteriaParser = new JudgmentCriteriaParser) {}
 
     /**
      * @param  array<string,mixed>  $analysis
@@ -159,20 +154,18 @@ final class PersistPcaExtractionAction
         }
 
         return collect($subcriteria)
-            ->map(function (array $subcriterion) use ($criterion): JudgmentCriterionData {
-                return JudgmentCriterionData::fromArray([
-                    'section_number' => $subcriterion['section_number'] !== '' ? $subcriterion['section_number'] : $criterion->sectionNumber,
-                    'section_title' => $subcriterion['section_title'] !== '' ? $subcriterion['section_title'] : $criterion->sectionTitle,
-                    'description' => $subcriterion['section_title'] !== '' ? $subcriterion['section_title'] : $criterion->description,
-                    'priority' => $criterion->priority,
-                    'criterion_type' => 'judgment',
-                    'score_points' => $subcriterion['score_points'],
-                    'source' => 'parser',
-                    'confidence' => 0.65,
-                    'source_reference' => $criterion->sourceReference,
-                    'metadata' => $criterion->metadata,
-                ]);
-            })
+            ->map(fn (array $subcriterion): JudgmentCriterionData => JudgmentCriterionData::fromArray([
+                'section_number' => $subcriterion['section_number'] !== '' ? $subcriterion['section_number'] : $criterion->sectionNumber,
+                'section_title' => $subcriterion['section_title'] !== '' ? $subcriterion['section_title'] : $criterion->sectionTitle,
+                'description' => $subcriterion['section_title'] !== '' ? $subcriterion['section_title'] : $criterion->description,
+                'priority' => $criterion->priority,
+                'criterion_type' => 'judgment',
+                'score_points' => $subcriterion['score_points'],
+                'source' => 'parser',
+                'confidence' => 0.65,
+                'source_reference' => $criterion->sourceReference,
+                'metadata' => $criterion->metadata,
+            ]))
             ->all();
     }
 
@@ -257,10 +250,6 @@ final class PersistPcaExtractionAction
 
         if (in_array($normalizedType, ['judgment', 'automatic'], true)) {
             return $normalizedType;
-        }
-
-        if (preg_match('/juicio\s+de\s+valor/u', $source) === 1) {
-            return 'judgment';
         }
 
         if (preg_match('/autom[aá]tic|f[oó]rmula|precio|coste|horas/u', $source) === 1) {

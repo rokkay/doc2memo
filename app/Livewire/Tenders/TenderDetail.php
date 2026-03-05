@@ -43,25 +43,27 @@ class TenderDetail extends Component
     #[Computed]
     public function statusConfig(): array
     {
-        return match ($this->tender->status) {
+        $statuses = [
             'pending' => ['label' => 'Pendiente', 'variant' => 'secondary'],
             'analyzing' => ['label' => 'Analizando', 'variant' => 'info'],
             'completed' => ['label' => 'Completado', 'variant' => 'success'],
             'failed' => ['label' => 'Error', 'variant' => 'error'],
-            default => ['label' => ucfirst($this->tender->status), 'variant' => 'default'],
-        };
+        ];
+
+        return $statuses[$this->tender->status]
+            ?? ['label' => ucfirst($this->tender->status), 'variant' => 'default'];
     }
 
     #[Computed]
     public function statusLabel(): string
     {
-        return $this->statusConfig['label'];
+        return $this->statusConfig()['label'];
     }
 
     #[Computed]
     public function statusVariant(): string
     {
-        return $this->statusConfig['variant'];
+        return $this->statusConfig()['variant'];
     }
 
     #[Computed]

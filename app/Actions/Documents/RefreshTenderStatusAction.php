@@ -10,7 +10,11 @@ final class RefreshTenderStatusAction
 {
     public function __invoke(Document $document): void
     {
-        $tender = $document->tender->fresh();
+        $tender = $document->tender()->first();
+
+        if ($tender === null) {
+            return;
+        }
 
         if ($tender->documents()->where('status', 'failed')->exists()) {
             $tender->update(['status' => 'failed']);

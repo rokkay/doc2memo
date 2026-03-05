@@ -52,14 +52,7 @@ INSTRUCTIONS;
     public function edit(string $content): string
     {
         $response = $this->prompt($this->promptText($content));
-
-        $editedContent = '';
-
-        if (is_array($response)) {
-            $editedContent = (string) ($response['content'] ?? '');
-        } elseif ($response instanceof \ArrayAccess) {
-            $editedContent = (string) ($response['content'] ?? '');
-        }
+        $editedContent = (string) ($response['content'] ?? '');
 
         $sanitized = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $editedContent);
 

@@ -285,3 +285,39 @@ it('can regenerate a single section from the memory view', function (): void {
 
     Queue::assertPushed(GenerateTechnicalMemorySection::class, fn (GenerateTechnicalMemorySection $job): bool => $job->technicalMemorySectionId === $section?->id);
 });
+
+it('uses dedicated criteria count when dedicated extractor results exist', function (): void {
+    $tender = Tender::factory()->create();
+
+    ExtractedCriterion::factory()->create([
+        'tender_id' => $tender->id,
+        'criterion_type' => 'judgment',
+        'source' => 'analyzer',
+    ]);
+
+    ExtractedCriterion::factory()->create([
+        'tender_id' => $tender->id,
+        'criterion_type' => 'judgment',
+        'source' => 'dedicated_extractor',
+    ]);
+
+    Livewire::test(ShowMemory::class, ['tender' => $tender])
+        ->assertSet('judgmentCriteriaCount', 1);
+});
+
+it('returns early when trying to regenerate without memory or unknown section', function (): void {
+    $tenderWithoutMemory = Tender::factory()->create();
+
+    Livewire::test(ShowMemory::class, ['tender' => $tenderWithoutMemory])
+        ->call('regenerateSection', 999)
+        ->assertSet('judgmentCriteriaCount', 0);
+
+    $tenderWithMemory = Tender::factory()->create();
+    TechnicalMemory::factory()->create([
+        'tender_id' => $tenderWithMemory->id,
+    ]);
+
+    Livewire::test(ShowMemory::class, ['tender' => $tenderWithMemory])
+        ->call('regenerateSection', 999)
+        ->assertSet('judgmentCriteriaCount', 0);
+});

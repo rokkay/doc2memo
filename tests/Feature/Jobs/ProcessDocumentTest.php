@@ -11,6 +11,7 @@ use App\Models\Document;
 use App\Models\Tender;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 use function Pest\Laravel\assertDatabaseHas;
@@ -378,4 +379,27 @@ it('stores analyzer token usage metadata and char fallback for document analysis
         ->and((int) ($extractorEntry?->input_chars ?? 0))->toBe(0);
 
     RecordAiUsageFromAgentPrompted::flush();
+});
+
+it('marks document and tender as failed when processing throws', function (): void {
+    Log::spy();
+
+    $tender = Tender::factory()->create(['status' => 'analyzing']);
+    $document = Document::factory()->create([
+        'tender_id' => $tender->id,
+        'status' => 'processing',
+        'file_path' => 'documents/missing.md',
+        'mime_type' => 'text/markdown',
+    ]);
+
+    expect(fn (): mixed => new ProcessDocument($document)->handle())
+        ->toThrow(\ErrorException::class);
+
+    expect($document->fresh()->status)->toBe('failed')
+        ->and($document->fresh()->processing_error)->not->toBeNull()
+        ->and($document->fresh()->extracted_text)->toContain('Error:')
+        ->and($tender->fresh()->status)->toBe('failed');
+
+    Log::shouldHaveReceived('error')
+        ->once();
 });

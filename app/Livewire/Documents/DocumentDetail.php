@@ -19,35 +19,38 @@ class DocumentDetail extends Component
     #[Computed]
     public function documentTypeLabel(): string
     {
-        return match ($this->document->document_type) {
+        $labels = [
             'pca' => 'Pliego de Condiciones Administrativas',
             'ppt' => 'Pliego de Prescripciones Técnicas',
-            default => strtoupper($this->document->document_type),
-        };
+        ];
+
+        return $labels[$this->document->document_type] ?? strtoupper($this->document->document_type);
     }
 
     #[Computed]
     public function statusConfig(): array
     {
-        return match ($this->document->status) {
+        $statuses = [
             'uploaded' => ['label' => 'Subido', 'variant' => 'secondary'],
             'processing' => ['label' => 'Procesando', 'variant' => 'info'],
             'analyzed' => ['label' => 'Analizado', 'variant' => 'success'],
             'failed' => ['label' => 'Error', 'variant' => 'error'],
-            default => ['label' => ucfirst($this->document->status), 'variant' => 'default'],
-        };
+        ];
+
+        return $statuses[$this->document->status]
+            ?? ['label' => ucfirst($this->document->status), 'variant' => 'default'];
     }
 
     #[Computed]
     public function statusLabel(): string
     {
-        return $this->statusConfig['label'];
+        return $this->statusConfig()['label'];
     }
 
     #[Computed]
     public function statusVariant(): string
     {
-        return $this->statusConfig['variant'];
+        return $this->statusConfig()['variant'];
     }
 
     public function render(): View

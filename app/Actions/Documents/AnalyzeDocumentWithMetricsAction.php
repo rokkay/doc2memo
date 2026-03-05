@@ -42,7 +42,8 @@ final class AnalyzeDocumentWithMetricsAction
         $analysis = $documentAnalyzer->analyze($text);
         $analysisAgentMetrics['output_chars'] = $this->estimateSerializedChars($analysis);
         $analysisAgentMetrics['status'] = 'completed';
-        $analysisAgentMetrics['usage'] = RecordAiUsageFromAgentPrompted::pullUsageForAgent(DocumentAnalyzer::class);
+        $analysisUsage = RecordAiUsageFromAgentPrompted::pullUsageForAgent(DocumentAnalyzer::class);
+        $analysisAgentMetrics['usage'] = $analysisUsage;
 
         $dedicatedCriteria = [];
 
@@ -67,25 +68,29 @@ final class AnalyzeDocumentWithMetricsAction
                 status: $dedicatedExtractorMetrics['status'],
             ),
         ]);
+
+        $analysisUsage = $this->normalizeUsage($analysisUsage);
+        $dedicatedUsage = $this->normalizeUsage($dedicatedExtractorMetrics['usage']);
+
         $costSummary['breakdown']['document_analyzer']['token_usage'] = [
-            'available' => is_array($analysisAgentMetrics['usage']),
-            'prompt_tokens' => (int) ($analysisAgentMetrics['usage']['prompt_tokens'] ?? 0),
-            'completion_tokens' => (int) ($analysisAgentMetrics['usage']['completion_tokens'] ?? 0),
-            'cache_write_input_tokens' => (int) ($analysisAgentMetrics['usage']['cache_write_input_tokens'] ?? 0),
-            'cache_read_input_tokens' => (int) ($analysisAgentMetrics['usage']['cache_read_input_tokens'] ?? 0),
-            'reasoning_tokens' => (int) ($analysisAgentMetrics['usage']['reasoning_tokens'] ?? 0),
+            'available' => $analysisAgentMetrics['usage'] !== null,
+            'prompt_tokens' => $analysisUsage['prompt_tokens'],
+            'completion_tokens' => $analysisUsage['completion_tokens'],
+            'cache_write_input_tokens' => $analysisUsage['cache_write_input_tokens'],
+            'cache_read_input_tokens' => $analysisUsage['cache_read_input_tokens'],
+            'reasoning_tokens' => $analysisUsage['reasoning_tokens'],
         ];
         $costSummary['breakdown']['document_analyzer']['char_estimate_fallback'] = [
             'input_chars' => $analysisAgentMetrics['input_chars'],
             'output_chars' => $analysisAgentMetrics['output_chars'],
         ];
         $costSummary['breakdown']['dedicated_judgment_extractor']['token_usage'] = [
-            'available' => is_array($dedicatedExtractorMetrics['usage']),
-            'prompt_tokens' => (int) ($dedicatedExtractorMetrics['usage']['prompt_tokens'] ?? 0),
-            'completion_tokens' => (int) ($dedicatedExtractorMetrics['usage']['completion_tokens'] ?? 0),
-            'cache_write_input_tokens' => (int) ($dedicatedExtractorMetrics['usage']['cache_write_input_tokens'] ?? 0),
-            'cache_read_input_tokens' => (int) ($dedicatedExtractorMetrics['usage']['cache_read_input_tokens'] ?? 0),
-            'reasoning_tokens' => (int) ($dedicatedExtractorMetrics['usage']['reasoning_tokens'] ?? 0),
+            'available' => $dedicatedExtractorMetrics['usage'] !== null,
+            'prompt_tokens' => $dedicatedUsage['prompt_tokens'],
+            'completion_tokens' => $dedicatedUsage['completion_tokens'],
+            'cache_write_input_tokens' => $dedicatedUsage['cache_write_input_tokens'],
+            'cache_read_input_tokens' => $dedicatedUsage['cache_read_input_tokens'],
+            'reasoning_tokens' => $dedicatedUsage['reasoning_tokens'],
         ];
         $costSummary['breakdown']['dedicated_judgment_extractor']['char_estimate_fallback'] = [
             'input_chars' => $dedicatedExtractorMetrics['input_chars'],
@@ -101,7 +106,7 @@ final class AnalyzeDocumentWithMetricsAction
 
     /**
      * @param  array<int,mixed>  $criteria
-     * @param  array{model_name:string,input_chars:int,output_chars:int,status:string}  $dedicatedExtractorMetrics
+     * @param  array{model_name:string,input_chars:int,output_chars:int,status:string,usage:?array{prompt_tokens:int,completion_tokens:int,cache_write_input_tokens:int,cache_read_input_tokens:int,reasoning_tokens:int}}  $dedicatedExtractorMetrics
      * @return array<int,JudgmentCriterionData>
      */
     private function extractDedicatedJudgmentCriteria(string $sourceText, array $criteria, array &$dedicatedExtractorMetrics): array
@@ -123,23 +128,22 @@ final class AnalyzeDocumentWithMetricsAction
             $dedicatedExtractorMetrics['usage'] = RecordAiUsageFromAgentPrompted::pullUsageForAgent(PcaJudgmentCriteriaExtractorAgent::class);
 
             return collect($items)
-                ->filter(fn (mixed $item): bool => is_array($item))
                 ->map(fn (array $item): JudgmentCriterionData => JudgmentCriterionData::fromArray([
-                    'section_number' => $item['section_number'] ?? null,
-                    'section_title' => $item['section_title'] ?? 'Sin sección',
-                    'description' => $item['description'] ?? '',
-                    'priority' => $item['priority'] ?? 'mandatory',
+                    'section_number' => $item['section_number'],
+                    'section_title' => $item['section_title'],
+                    'description' => $item['description'],
+                    'priority' => $item['priority'],
                     'criterion_type' => 'judgment',
-                    'score_points' => $item['score_points'] ?? null,
+                    'score_points' => $item['score_points'],
                     'source' => 'dedicated_extractor',
                     'confidence' => 0.95,
                     'source_reference' => $this->resolveSourceReference(
-                        sectionNumber: is_string($item['section_number'] ?? null) ? $item['section_number'] : null,
-                        sectionTitle: $item['section_title'] ?? '',
-                        metadata: is_array($item['metadata'] ?? null) ? $item['metadata'] : [],
+                        sectionNumber: $item['section_number'],
+                        sectionTitle: $item['section_title'],
+                        metadata: $item['metadata'],
                     ),
                     'group_key' => '',
-                    'metadata' => is_array($item['metadata'] ?? null) ? $item['metadata'] : null,
+                    'metadata' => $item['metadata'],
                 ]))
                 ->filter(fn (JudgmentCriterionData $item): bool => $item->sectionTitle !== '' && $item->description !== '')
                 ->values()
@@ -222,5 +226,20 @@ final class AnalyzeDocumentWithMetricsAction
     private function calculator(): AiCostBreakdownCalculator
     {
         return $this->costBreakdownCalculator ??= new AiCostBreakdownCalculator;
+    }
+
+    /**
+     * @param  array{prompt_tokens:int,completion_tokens:int,cache_write_input_tokens:int,cache_read_input_tokens:int,reasoning_tokens:int}|null  $usage
+     * @return array{prompt_tokens:int,completion_tokens:int,cache_write_input_tokens:int,cache_read_input_tokens:int,reasoning_tokens:int}
+     */
+    private function normalizeUsage(?array $usage): array
+    {
+        return [
+            'prompt_tokens' => (int) ($usage['prompt_tokens'] ?? 0),
+            'completion_tokens' => (int) ($usage['completion_tokens'] ?? 0),
+            'cache_write_input_tokens' => (int) ($usage['cache_write_input_tokens'] ?? 0),
+            'cache_read_input_tokens' => (int) ($usage['cache_read_input_tokens'] ?? 0),
+            'reasoning_tokens' => (int) ($usage['reasoning_tokens'] ?? 0),
+        ];
     }
 }

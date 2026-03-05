@@ -7,7 +7,6 @@ namespace App\ViewData;
 use App\Enums\TechnicalMemorySectionStatus;
 use App\Models\ExtractedCriterion;
 use App\Models\TechnicalMemoryMetricEvent;
-use App\Models\TechnicalMemorySection;
 use App\Models\Tender;
 use App\Support\SectionTitleNormalizer;
 use App\Support\TechnicalMemoryMarkdownBuilder;
@@ -128,50 +127,47 @@ final readonly class TechnicalMemoryViewData
             ->where('criterion_type', 'judgment')
             ->groupBy(fn (ExtractedCriterion $criterion): string => (string) ($criterion->group_key ?? ''));
 
-        $sections = $memory->sections
-            ->sortBy('sort_order')
-            ->map(function (TechnicalMemorySection $section) use ($criteriaByGroup): array {
-                $anchor = 'section-'.$section->id;
-                $groupKey = (string) ($section->group_key ?? '');
-                $criteria = $criteriaByGroup->get($groupKey, collect());
+        $sections = [];
 
-                $evidence = $criteria
-                    ->map(function (ExtractedCriterion $criterion): array {
-                        $label = trim((string) ($criterion->section_number ?? ''));
-                        $label = $label !== '' ? $label : 'Criterio';
+        foreach ($memory->sections->sortBy('sort_order') as $section) {
+            $anchor = 'section-'.$section->id;
+            $groupKey = (string) ($section->group_key ?? '');
+            /** @var Collection<int, ExtractedCriterion> $criteria */
+            $criteria = $criteriaByGroup->get($groupKey, collect());
 
-                        $points = $criterion->score_points !== null
-                            ? number_format((float) $criterion->score_points, 2, ',', '.').' pts'
-                            : 'Puntos N/D';
+            $evidence = $criteria
+                ->map(function (ExtractedCriterion $criterion): array {
+                    $label = trim((string) ($criterion->section_number ?? ''));
+                    $label = $label !== '' ? $label : 'Criterio';
 
-                        return [
-                            'label' => $label.' · '.$points,
-                            'detail' => trim((string) $criterion->description),
-                            'reference' => $criterion->source_reference !== null ? trim((string) $criterion->source_reference) : null,
-                        ];
-                    })
-                    ->filter(fn (array $item): bool => $item['detail'] !== '')
-                    ->unique('detail')
-                    ->take(3)
-                    ->values()
-                    ->all();
+                    $points = $criterion->score_points !== null
+                        ? number_format((float) $criterion->score_points, 2, ',', '.').' pts'
+                        : 'Puntos N/D';
 
-                return [
-                    'id' => $section->id,
-                    'anchor' => $anchor,
-                    'title' => SectionTitleNormalizer::heading($section->section_number, (string) $section->section_title),
-                    'content' => trim((string) ($section->content ?? '')),
-                    'points' => (float) ($section->total_points ?? 0),
-                    'weight' => (float) ($section->weight_percent ?? 0),
-                    'criteria_count' => (int) ($section->criteria_count ?? 0),
-                    'status' => $section->status instanceof TechnicalMemorySectionStatus
-                        ? $section->status->value
-                        : (string) $section->status,
-                    'evidence' => $evidence,
-                ];
-            })
-            ->values()
-            ->all();
+                    return [
+                        'label' => $label.' · '.$points,
+                        'detail' => trim((string) $criterion->description),
+                        'reference' => $criterion->source_reference !== null ? trim((string) $criterion->source_reference) : null,
+                    ];
+                })
+                ->filter(fn (array $item): bool => $item['detail'] !== '')
+                ->unique('detail')
+                ->take(3)
+                ->values()
+                ->all();
+
+            $sections[] = [
+                'id' => $section->id,
+                'anchor' => $anchor,
+                'title' => SectionTitleNormalizer::heading($section->section_number, (string) $section->section_title),
+                'content' => trim((string) ($section->content ?? '')),
+                'points' => (float) ($section->total_points ?? 0),
+                'weight' => (float) ($section->weight_percent ?? 0),
+                'criteria_count' => (int) ($section->criteria_count ?? 0),
+                'status' => (string) $section->getRawOriginal('status'),
+                'evidence' => $evidence,
+            ];
+        }
 
         $completedCount = count(array_filter(
             $sections,
@@ -203,11 +199,11 @@ final readonly class TechnicalMemoryViewData
         $failedCount = count($failedSections);
 
         $totalCount = count($sections);
-        $totalPoints = array_reduce(
-            $sections,
-            static fn (float $carry, array $section): float => $carry + (float) $section['points'],
-            0.0,
-        );
+        $totalPoints = 0.0;
+
+        foreach ($sections as $section) {
+            $totalPoints += $section['points'];
+        }
 
         $progressPercent = $totalCount > 0
             ? (int) round(($completedCount / $totalCount) * 100)

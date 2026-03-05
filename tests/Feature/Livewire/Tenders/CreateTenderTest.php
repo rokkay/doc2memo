@@ -133,3 +133,22 @@ it('can remove ppt file after selection', function (): void {
 
     expect($component->get('pptFile'))->toBeNull();
 });
+
+it('dispatches notify error when creating tender fails', function (): void {
+    Tender::creating(function (): void {
+        throw new RuntimeException('cannot persist tender');
+    });
+
+    Livewire::test(CreateTender::class)
+        ->set('form.title', 'Tender with failure')
+        ->set('pcaFile', UploadedFile::fake()->create('pca.pdf', 100, 'application/pdf'))
+        ->set('pptFile', UploadedFile::fake()->create('ppt.pdf', 100, 'application/pdf'))
+        ->call('save')
+        ->assertDispatched('notify', [
+            'type' => 'error',
+            'message' => 'Error al crear la licitación: cannot persist tender',
+        ])
+        ->assertSet('isSubmitting', false);
+
+    Tender::flushEventListeners();
+});
