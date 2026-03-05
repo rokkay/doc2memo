@@ -103,3 +103,21 @@ it('has back link and download link labels', function (): void {
         ->assertSee('Volver')
         ->assertSee('Descargar');
 });
+
+it('shows uploaded status label', function (): void {
+    $document = Document::factory()->create([
+        'status' => 'uploaded',
+    ]);
+
+    Livewire::test(DocumentDetail::class, ['document' => $document])
+        ->assertSee('Subido');
+});
+
+it('shows processing status label', function (): void {
+    $document = Document::factory()->create([
+        'status' => 'processing',
+    ]);
+
+    Livewire::test(DocumentDetail::class, ['document' => $document])
+        ->assertSee('Procesando');
+});

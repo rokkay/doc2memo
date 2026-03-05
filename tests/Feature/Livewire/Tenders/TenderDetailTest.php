@@ -315,3 +315,113 @@ it('shows clear memory generation states in actions panel', function (): void {
         ->assertSee('Seccion en redaccion')
         ->assertSee('1/3 secciones completadas.');
 });
+
+it('returns empty memory progress when no technical memory exists', function (): void {
+    $tender = Tender::factory()->create();
+
+    Livewire::test(TenderDetail::class, ['tender' => $tender])
+        ->assertSet('memoryProgress.has_sections', false)
+        ->assertSet('memoryProgress.total_count', 0)
+        ->assertSet('memoryProgress.pending_count', 0)
+        ->assertSet('memoryProgress.generating_count', 0);
+});
+
+it('handles analyze documents service exceptions', function (): void {
+    $tender = Tender::factory()->create();
+
+    $documentAnalysisService = new class extends DocumentAnalysisService
+    {
+        public function __construct() {}
+
+        public function analyzeTender(Tender $tender): void
+        {
+            throw new RuntimeException('analysis failed');
+        }
+    };
+
+    app()->instance(DocumentAnalysisService::class, $documentAnalysisService);
+
+    Livewire::test(TenderDetail::class, ['tender' => $tender])
+        ->call('analyzeDocuments')
+        ->assertSet('isAnalyzing', false)
+        ->assertSet('errorMessage', 'Error al analizar los documentos: analysis failed');
+});
+
+it('sets error when retrying a document that is not found', function (): void {
+    $tender = Tender::factory()->create();
+
+    Livewire::test(TenderDetail::class, ['tender' => $tender])
+        ->call('retryDocument', 9999)
+        ->assertSet('isAnalyzing', false)
+        ->assertSet('errorMessage', 'Documento no encontrado para reintento.');
+});
+
+it('handles retry document service exceptions', function (): void {
+    $tender = Tender::factory()->create();
+    $document = Document::factory()->create([
+        'tender_id' => $tender->id,
+        'status' => 'failed',
+    ]);
+
+    $documentAnalysisService = new class extends DocumentAnalysisService
+    {
+        public function __construct() {}
+
+        public function analyzeDocument(Tender $tender, Document $document): void
+        {
+            throw new RuntimeException('retry failed');
+        }
+    };
+
+    app()->instance(DocumentAnalysisService::class, $documentAnalysisService);
+
+    Livewire::test(TenderDetail::class, ['tender' => $tender])
+        ->call('retryDocument', $document->id)
+        ->assertSet('isAnalyzing', false)
+        ->assertSet('errorMessage', 'Error al reintentar el análisis: retry failed');
+});
+
+it('handles memory generation service exceptions', function (): void {
+    $tender = Tender::factory()->create(['status' => 'completed']);
+
+    $generationService = new class extends \App\Services\TechnicalMemoryGenerationService
+    {
+        public function __construct() {}
+
+        public function generate(Tender $tender): TechnicalMemory
+        {
+            throw new RuntimeException('generation failed');
+        }
+    };
+
+    app()->instance(\App\Services\TechnicalMemoryGenerationService::class, $generationService);
+
+    Livewire::test(TenderDetail::class, ['tender' => $tender])
+        ->call('generateMemory')
+        ->assertSet('isGeneratingMemory', false)
+        ->assertSet('errorMessage', 'Error al generar la memoria técnica: generation failed');
+});
+
+it('analyzes documents successfully and dispatches completion event', function (): void {
+    $tender = Tender::factory()->create();
+
+    Document::factory()->create([
+        'tender_id' => $tender->id,
+        'status' => 'uploaded',
+    ]);
+
+    $documentAnalysisService = new class extends DocumentAnalysisService
+    {
+        public function __construct() {}
+
+        public function analyzeTender(Tender $tender): void {}
+    };
+
+    app()->instance(DocumentAnalysisService::class, $documentAnalysisService);
+
+    Livewire::test(TenderDetail::class, ['tender' => $tender])
+        ->assertSet('hasAnalyzableDocuments', true)
+        ->call('analyzeDocuments')
+        ->assertSet('isAnalyzing', false)
+        ->assertDispatched('analysis-completed');
+});

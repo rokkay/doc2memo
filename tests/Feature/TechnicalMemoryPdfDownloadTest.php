@@ -58,3 +58,30 @@ it('downloads the technical memory in pdf format', function (): void {
         ]
         && $pdf->contains(['Documento técnico', 'Indice', '## 1.1 Introducción', 'Página @pageNumber de @totalPages']));
 });
+
+it('renders technical memory page and ignores empty sections in pdf', function (): void {
+    Pdf::fake();
+
+    $tender = Tender::factory()->create();
+
+    $memory = TechnicalMemory::factory()->create([
+        'tender_id' => $tender->id,
+    ]);
+
+    TechnicalMemorySection::factory()->create([
+        'technical_memory_id' => $memory->id,
+        'section_number' => '1.1',
+        'section_title' => 'Introducción',
+        'sort_order' => 1,
+        'content' => '',
+    ]);
+
+    $this->get(route('technical-memories.show', $tender))
+        ->assertSuccessful();
+
+    $this->get(route('technical-memories.download', $memory))
+        ->assertSuccessful();
+
+    Pdf::assertRespondedWithPdf(fn (PdfBuilder $pdf): bool => $pdf->contains(['Documento técnico'])
+        && ! $pdf->contains(['## 1.1 Introducción']));
+});
