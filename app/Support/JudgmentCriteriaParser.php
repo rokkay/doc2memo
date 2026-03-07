@@ -34,9 +34,9 @@ final class JudgmentCriteriaParser
         if (count($matches) >= 2) {
             return collect($matches)
                 ->map(function (array $match): array {
-                    $sectionNumber = trim($match[1] ?? '');
-                    $sectionTitle = $this->formatSubcriterionTitle($match[2] ?? '');
-                    $scorePoints = $this->parseNumericValue($match[3] ?? null) ?? 0.0;
+                    $sectionNumber = trim($match[1]);
+                    $sectionTitle = $this->formatSubcriterionTitle($match[2]);
+                    $scorePoints = $this->parseNumericValue($match[3]) ?? 0.0;
 
                     return [
                         'section_number' => $sectionNumber,

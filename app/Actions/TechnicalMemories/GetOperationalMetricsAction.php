@@ -125,6 +125,7 @@ final class GetOperationalMetricsAction
         return $metrics
             ->groupBy('technical_memory_id')
             ->map(function (Collection $memoryMetrics, int $memoryId) use ($generationCostEntries): array {
+                /** @var TechnicalMemoryGenerationMetric|null $first */
                 $first = $memoryMetrics->first();
                 $memoryCostEntries = $generationCostEntries
                     ->where('technical_memory_id', $memoryId)
@@ -136,7 +137,7 @@ final class GetOperationalMetricsAction
 
                 return [
                     'technical_memory_id' => $memoryId,
-                    'memory_title' => (string) ($first?->technicalMemory?->title ?? ''),
+                    'memory_title' => (string) ($first?->technicalMemory->title ?? ''),
                     'attempts' => $memoryMetrics->count(),
                     'completed' => $memoryMetrics->where('status', 'completed')->count(),
                     'failed' => $memoryMetrics->where('status', 'failed')->count(),
@@ -160,13 +161,14 @@ final class GetOperationalMetricsAction
         return $metrics
             ->groupBy('technical_memory_section_id')
             ->map(function (Collection $sectionMetrics, int $sectionId): array {
+                /** @var TechnicalMemoryGenerationMetric|null $first */
                 $first = $sectionMetrics->first();
                 $retryCount = $sectionMetrics->filter(fn (TechnicalMemoryGenerationMetric $metric): bool => $metric->attempt > 1)->count();
                 $failureCount = $sectionMetrics->where('status', 'failed')->count();
 
                 return [
                     'technical_memory_section_id' => $sectionId,
-                    'section_title' => (string) ($first?->technicalMemorySection?->section_title ?? ''),
+                    'section_title' => (string) ($first?->technicalMemorySection->section_title ?? ''),
                     'retry_count' => $retryCount,
                     'failure_count' => $failureCount,
                     'issue_score' => $retryCount + $failureCount,

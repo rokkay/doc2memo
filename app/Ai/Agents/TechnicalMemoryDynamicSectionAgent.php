@@ -2,6 +2,7 @@
 
 namespace App\Ai\Agents;
 
+use ArrayAccess;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Attributes\Model;
 use Laravel\Ai\Attributes\Provider;
@@ -66,7 +67,7 @@ INSTRUCTIONS;
 
         if (is_array($response)) {
             $content = (string) ($response['content'] ?? '');
-        } elseif ($response instanceof \ArrayAccess) {
+        } elseif ($response instanceof ArrayAccess) {
             $content = (string) ($response['content'] ?? '');
         } elseif (is_object($response) && is_string($response->text ?? null)) {
             $decoded = json_decode($response->text, true);

@@ -56,7 +56,10 @@ class TenderController extends Controller
             $pptDocument = $this->storeDocument($tender, $request->file('ppt_file'), 'ppt');
 
             // Start analysis immediately after upload
-            foreach ($tender->documents as $document) {
+            /** @var \Illuminate\Database\Eloquent\Collection<int, Document> $documents */
+            $documents = $tender->documents;
+
+            foreach ($documents as $document) {
                 dispatch(new \App\Jobs\ProcessDocument($document));
             }
 
@@ -78,6 +81,7 @@ class TenderController extends Controller
 
     public function analyze(Tender $tender): RedirectResponse
     {
+        /** @var \Illuminate\Database\Eloquent\Collection<int, Document> $pendingDocuments */
         $pendingDocuments = $tender->documents->where('status', 'uploaded');
 
         if ($pendingDocuments->isEmpty()) {

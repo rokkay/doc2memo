@@ -24,8 +24,8 @@ final class UpsertMetricRunSummaryAction
             ->where('run_id', $runId)
             ->first();
 
-        $resolvedTrigger = $trigger ?? $existingRun?->trigger ?? 'full_generation';
-        $resolvedSectionsTotal = $sectionsTotal ?? $existingRun?->sections_total ?? 1;
+        $resolvedTrigger = $trigger ?? $existingRun->trigger ?? 'full_generation';
+        $resolvedSectionsTotal = $sectionsTotal ?? $existingRun->sections_total ?? 1;
 
         $run = TechnicalMemoryMetricRun::query()->firstOrCreate(
             [

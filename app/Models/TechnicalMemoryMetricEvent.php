@@ -6,6 +6,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property int $id
+ * @property int $technical_memory_id
+ * @property int|null $technical_memory_section_id
+ * @property string $run_id
+ */
 class TechnicalMemoryMetricEvent extends Model
 {
     use HasFactory;
@@ -42,11 +48,17 @@ class TechnicalMemoryMetricEvent extends Model
         ];
     }
 
+    /**
+     * @return BelongsTo<TechnicalMemory, $this>
+     */
     public function technicalMemory(): BelongsTo
     {
         return $this->belongsTo(TechnicalMemory::class);
     }
 
+    /**
+     * @return BelongsTo<TechnicalMemorySection, $this>
+     */
     public function technicalMemorySection(): BelongsTo
     {
         return $this->belongsTo(TechnicalMemorySection::class);
