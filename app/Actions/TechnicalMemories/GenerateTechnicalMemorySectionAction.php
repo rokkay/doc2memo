@@ -1,9 +1,7 @@
 <?php
 
-namespace App\Jobs;
+namespace App\Actions\TechnicalMemories;
 
-use App\Actions\TechnicalMemories\RecordMetricEventAction;
-use App\Actions\TechnicalMemories\UpsertMetricRunSummaryAction;
 use App\Ai\Agents\TechnicalMemoryDynamicSectionAgent;
 use App\Ai\Agents\TechnicalMemorySectionEditorAgent;
 use App\Data\AiAgentRunMetricsData;
@@ -19,31 +17,25 @@ use App\Models\TechnicalMemorySection;
 use App\Support\AiCostBreakdownCalculator;
 use App\Support\TechnicalMemoryMetrics;
 use App\Support\TechnicalMemorySectionQualityGate;
-use Illuminate\Bus\Batchable;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
 
-class GenerateTechnicalMemorySection implements ShouldQueue
+final class GenerateTechnicalMemorySectionAction
 {
-    use Batchable, Queueable;
-
     public function __construct(
         public int $technicalMemorySectionId,
         public TechnicalMemorySectionData $section,
         public TechnicalMemoryGenerationContextData $context,
         public int $qualityAttempt = 0,
         public string $runId = '',
+        public ?string $prefetchedDynamicContent = null,
+        public ?string $forcedDynamicFailureMessage = null,
+        public bool $useNativeQueueing = false,
     ) {}
 
     public function handle(): void
     {
-        if ($this->batch()?->cancelled()) {
-            return;
-        }
-
         $startedAt = microtime(true);
 
         $section = TechnicalMemorySection::query()
@@ -114,7 +106,12 @@ class GenerateTechnicalMemorySection implements ShouldQueue
 
             $dynamicAgentMetrics['model_name'] = $dynamicAgent->modelName();
             $dynamicAgentMetrics['input_chars'] = max(0, $dynamicAgent->estimateInputChars());
-            $content = $dynamicAgent->generate();
+
+            if ($this->forcedDynamicFailureMessage !== null && $this->forcedDynamicFailureMessage !== '') {
+                throw new \RuntimeException($this->forcedDynamicFailureMessage);
+            }
+
+            $content = $this->prefetchedDynamicContent ?? $dynamicAgent->generate();
             $dynamicAgentMetrics['output_chars'] = max(0, mb_strlen(trim($content)));
             $dynamicAgentMetrics['status'] = 'completed';
             $dynamicAgentMetrics['usage'] = RecordAiUsageFromAgentPrompted::pullUsageForAgent(TechnicalMemoryDynamicSectionAgent::class);
@@ -206,18 +203,22 @@ class GenerateTechnicalMemorySection implements ShouldQueue
                         'error_message' => $qualityFeedback,
                     ]);
 
-                    $retryJob = new self(
-                        technicalMemorySectionId: $this->technicalMemorySectionId,
-                        section: $this->section,
-                        context: $context->withQualityFeedback($qualityFeedback),
-                        qualityAttempt: $this->qualityAttempt + 1,
-                        runId: $resolvedRunId,
-                    );
-
-                    if ($this->batch() !== null) {
-                        $this->batch()->add([$retryJob]);
+                    if ($this->useNativeQueueing) {
+                        resolve(QueueGenerateTechnicalMemorySectionAction::class)(
+                            technicalMemorySectionId: $this->technicalMemorySectionId,
+                            section: $this->section,
+                            context: $context->withQualityFeedback($qualityFeedback),
+                            qualityAttempt: $this->qualityAttempt + 1,
+                            runId: $resolvedRunId,
+                        );
                     } else {
-                        dispatch(new self(technicalMemorySectionId: $this->technicalMemorySectionId, section: $this->section, context: $context->withQualityFeedback($qualityFeedback), qualityAttempt: $this->qualityAttempt + 1, runId: $resolvedRunId));
+                        resolve(QueueGenerateTechnicalMemorySectionAction::class)(
+                            technicalMemorySectionId: $this->technicalMemorySectionId,
+                            section: $this->section,
+                            context: $context->withQualityFeedback($qualityFeedback),
+                            qualityAttempt: $this->qualityAttempt + 1,
+                            runId: $resolvedRunId,
+                        );
                     }
 
                     $recordMetricEvent(

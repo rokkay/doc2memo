@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use App\Actions\TechnicalMemories\RegenerateSectionAction;
+use App\Ai\Agents\TechnicalMemoryDynamicSectionAgent;
 use App\Enums\TechnicalMemorySectionStatus;
-use App\Jobs\GenerateTechnicalMemorySection;
 use App\Models\Document;
 use App\Models\DocumentInsight;
 use App\Models\ExtractedCriterion;
@@ -13,13 +13,13 @@ use App\Models\TechnicalMemory;
 use App\Models\TechnicalMemorySection;
 use App\Models\Tender;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
+use Laravel\Ai\QueuedAgentPrompt;
 
 uses(RefreshDatabase::class);
 
 it('resets and requeues a single section regeneration', function (): void {
-    Queue::fake();
+    TechnicalMemoryDynamicSectionAgent::fake()->preventStrayPrompts();
 
     $tender = Tender::factory()->create();
     $memory = TechnicalMemory::factory()->create([
@@ -69,17 +69,18 @@ it('resets and requeues a single section regeneration', function (): void {
     expect($section?->content)->toBeNull();
     expect($memory?->status)->toBe('draft');
     expect($memory?->generated_at)->toBeNull();
+    expect($memory)->not->toBeNull();
 
-    Queue::assertPushed(GenerateTechnicalMemorySection::class, fn (GenerateTechnicalMemorySection $job): bool => $job->technicalMemorySectionId === $section?->id
-        && $job->runId !== ''
-        && is_string($job->context->runId)
-        && $job->context->runId === $job->runId);
+    TechnicalMemoryDynamicSectionAgent::assertQueued(function (QueuedAgentPrompt $prompt): bool {
+        return $prompt->agent instanceof TechnicalMemoryDynamicSectionAgent
+            && $prompt->prompt !== '';
+    });
 
-    expect($memory?->metricRuns()->latest('id')->value('run_id'))->not->toBe($existingRunId);
+    expect($memory->metricRuns()->latest('id')->value('run_id'))->not->toBe($existingRunId);
 });
 
 it('builds regeneration context with analyzer criteria and document insights', function (): void {
-    Queue::fake();
+    TechnicalMemoryDynamicSectionAgent::fake()->preventStrayPrompts();
 
     $tender = Tender::factory()->create();
     $pcaDocument = Document::factory()->create([
@@ -135,14 +136,21 @@ it('builds regeneration context with analyzer criteria and document insights', f
 
     (new RegenerateSectionAction)($memory, $section);
 
-    Queue::assertPushed(GenerateTechnicalMemorySection::class, fn (GenerateTechnicalMemorySection $job): bool => $job->technicalMemorySectionId === $section->id
-        && count($job->context->pca['insights'] ?? []) === 1
-        && count($job->context->ppt['insights'] ?? []) === 1
-        && count($job->context->pca['criteria'] ?? []) === 1);
+    TechnicalMemoryDynamicSectionAgent::assertQueued(function (QueuedAgentPrompt $prompt): bool {
+        if (! $prompt->agent instanceof TechnicalMemoryDynamicSectionAgent) {
+            return false;
+        }
+
+        $promptText = $prompt->agent->buildPromptText();
+
+        return str_contains($promptText, 'Plazos')
+            && str_contains($promptText, 'Arquitectura')
+            && str_contains($promptText, 'Metodología');
+    });
 });
 
 it('prioritizes dedicated extractor criteria during regeneration', function (): void {
-    Queue::fake();
+    TechnicalMemoryDynamicSectionAgent::fake()->preventStrayPrompts();
 
     $tender = Tender::factory()->create();
     $memory = TechnicalMemory::factory()->create([
@@ -174,10 +182,15 @@ it('prioritizes dedicated extractor criteria during regeneration', function (): 
 
     (new RegenerateSectionAction)($memory, $section);
 
-    Queue::assertPushed(GenerateTechnicalMemorySection::class, function (GenerateTechnicalMemorySection $job): bool {
-        $criteria = $job->context->pca['criteria'] ?? [];
+    TechnicalMemoryDynamicSectionAgent::assertQueued(function (QueuedAgentPrompt $prompt): bool {
+        if (! $prompt->agent instanceof TechnicalMemoryDynamicSectionAgent) {
+            return false;
+        }
 
-        return count($criteria) === 1
-            && ($criteria[0]['source'] ?? null) === 'dedicated_extractor';
+        $promptText = $prompt->agent->buildPromptText();
+
+        return str_contains($promptText, 'Desde dedicated')
+            && str_contains($promptText, 'dedicated_extractor')
+            && ! str_contains($promptText, 'Desde analyzer');
     });
 });

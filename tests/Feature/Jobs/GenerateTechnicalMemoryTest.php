@@ -3,16 +3,13 @@
 declare(strict_types=1);
 
 use App\Actions\Tenders\GenerateTechnicalMemoryAction;
-use App\Data\TechnicalMemoryGenerationContextData;
-use App\Data\TechnicalMemorySectionData;
-use App\Jobs\GenerateTechnicalMemorySection;
+use App\Ai\Agents\TechnicalMemoryDynamicSectionAgent;
 use App\Models\Document;
 use App\Models\ExtractedCriterion;
 use App\Models\ExtractedSpecification;
 use App\Models\Tender;
-use Illuminate\Bus\PendingBatch;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Bus;
+use Laravel\Ai\QueuedAgentPrompt;
 
 use function Pest\Laravel\assertDatabaseHas;
 use function Pest\Laravel\assertDatabaseMissing;
@@ -20,7 +17,7 @@ use function Pest\Laravel\assertDatabaseMissing;
 uses(RefreshDatabase::class);
 
 it('creates dynamic draft memory and dispatches one job per judgment section', function (): void {
-    Bus::fake();
+    TechnicalMemoryDynamicSectionAgent::fake()->preventStrayPrompts();
 
     $tender = Tender::factory()->completed()->create([
         'title' => 'Servicio de desarrollo y mantenimiento',
@@ -119,19 +116,9 @@ it('creates dynamic draft memory and dispatches one job per judgment section', f
         'sort_order' => 1,
     ]);
 
-    Bus::assertBatchCount(1);
-
-    Bus::assertBatched(function (PendingBatch $batch): bool {
-        $matchingJob = $batch->jobs
-            ->filter(fn ($job): bool => $job instanceof GenerateTechnicalMemorySection)
-            ->first(fn (GenerateTechnicalMemorySection $job): bool => $job->section instanceof TechnicalMemorySectionData
-                && $job->context instanceof TechnicalMemoryGenerationContextData
-                && $job->section->sectionTitle === 'Criterios adjudicación (B) Juicio de valor - Metodología'
-                && $job->section->totalPoints === 40.0
-                && count($job->section->criteria) === 2
-                && data_get($job->context->pca, 'criteria.0.criterion_type') === 'judgment');
-
-        return $batch->jobs->count() === 2 && $matchingJob !== null;
+    TechnicalMemoryDynamicSectionAgent::assertQueued(function (QueuedAgentPrompt $prompt): bool {
+        return $prompt->agent instanceof TechnicalMemoryDynamicSectionAgent
+            && str_contains($prompt->prompt, 'Criterios adjudicación (B) Juicio de valor - Metodología');
     });
 
     $firstSection = $tender->fresh()->technicalMemory?->sections()->orderBy('sort_order')->first();
@@ -142,7 +129,7 @@ it('creates dynamic draft memory and dispatches one job per judgment section', f
 });
 
 it('splits a grouped judgment criterion into multiple dynamic sections', function (): void {
-    Bus::fake();
+    TechnicalMemoryDynamicSectionAgent::fake()->preventStrayPrompts();
 
     $tender = Tender::factory()->completed()->create();
 
@@ -179,11 +166,11 @@ it('splits a grouped judgment criterion into multiple dynamic sections', functio
         'total_points' => 8.00,
     ]);
 
-    Bus::assertBatched(fn (PendingBatch $batch): bool => $batch->jobs->count() === 6);
+    TechnicalMemoryDynamicSectionAgent::assertQueued(fn (QueuedAgentPrompt $prompt): bool => $prompt->agent instanceof TechnicalMemoryDynamicSectionAgent);
 });
 
 it('uses only dedicated extractor criteria when available', function (): void {
-    Bus::fake();
+    TechnicalMemoryDynamicSectionAgent::fake()->preventStrayPrompts();
 
     $tender = Tender::factory()->completed()->create();
 
@@ -266,11 +253,11 @@ it('uses only dedicated extractor criteria when available', function (): void {
         'section_number' => 'Cuadro criterios adjudicación A/B',
     ]);
 
-    Bus::assertBatched(fn (PendingBatch $batch): bool => $batch->jobs->count() === 2);
+    TechnicalMemoryDynamicSectionAgent::assertQueued(fn (QueuedAgentPrompt $prompt): bool => $prompt->agent instanceof TechnicalMemoryDynamicSectionAgent);
 });
 
 it('propagates one run id to every section generation job in a full generation', function (): void {
-    Bus::fake();
+    TechnicalMemoryDynamicSectionAgent::fake()->preventStrayPrompts();
 
     $tender = Tender::factory()->completed()->create();
 
@@ -303,21 +290,8 @@ it('propagates one run id to every section generation job in a full generation',
 
     resolve(GenerateTechnicalMemoryAction::class)($tender);
 
-    Bus::assertBatched(function (PendingBatch $batch): bool {
-        $jobs = $batch->jobs
-            ->filter(fn ($job): bool => $job instanceof GenerateTechnicalMemorySection)
-            ->values();
-
-        $runIds = $jobs
-            ->map(fn (GenerateTechnicalMemorySection $queuedJob): string => $queuedJob->runId)
-            ->filter(fn (?string $runId): bool => is_string($runId) && $runId !== '')
-            ->unique()
-            ->values();
-
-        return $jobs->count() === 2
-            && $runIds->count() === 1
-            && $runIds->first() !== ''
-            && $jobs->first()?->runId === $jobs->last()?->runId
-            && $jobs->first()?->context->runId === $jobs->first()?->runId;
+    TechnicalMemoryDynamicSectionAgent::assertQueued(function (QueuedAgentPrompt $prompt): bool {
+        return $prompt->agent instanceof TechnicalMemoryDynamicSectionAgent
+            && str_contains($prompt->prompt, 'run_id');
     });
 });

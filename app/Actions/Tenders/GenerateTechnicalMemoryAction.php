@@ -4,22 +4,19 @@ declare(strict_types=1);
 
 namespace App\Actions\Tenders;
 
+use App\Actions\TechnicalMemories\QueueGenerateTechnicalMemorySectionAction;
 use App\Actions\TechnicalMemories\UpsertMetricRunSummaryAction;
 use App\Data\JudgmentCriterionData;
 use App\Data\TechnicalMemoryGenerationContextData;
 use App\Data\TechnicalMemorySectionData;
 use App\Enums\TechnicalMemorySectionStatus;
-use App\Jobs\GenerateTechnicalMemorySection;
 use App\Models\DocumentInsight;
 use App\Models\ExtractedCriterion;
 use App\Models\ExtractedSpecification;
-use App\Models\TechnicalMemory;
 use App\Models\TechnicalMemorySection;
 use App\Models\Tender;
 use App\Support\JudgmentCriteriaParser;
-use Illuminate\Bus\Batch;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Str;
 
 final readonly class GenerateTechnicalMemoryAction
@@ -127,8 +124,6 @@ final readonly class GenerateTechnicalMemoryAction
 
         $totalPoints = (float) $sectionGroups->sum(fn (TechnicalMemorySectionData $group): float => $group->totalPoints);
 
-        $jobs = [];
-
         foreach ($sectionGroups->values() as $index => $group) {
             /** @var TechnicalMemorySectionData $group */
             $weightPercent = $totalPoints > 0
@@ -147,7 +142,7 @@ final readonly class GenerateTechnicalMemoryAction
                 'status' => TechnicalMemorySectionStatus::Pending,
             ]);
 
-            $jobs[] = new GenerateTechnicalMemorySection(
+            resolve(QueueGenerateTechnicalMemorySectionAction::class)(
                 technicalMemorySectionId: $section->id,
                 section: $group,
                 context: $generationContext,
@@ -155,42 +150,7 @@ final readonly class GenerateTechnicalMemoryAction
             );
         }
 
-        $memoryId = (int) $memory->id;
-        $runId = (string) $generationContext->runId;
-
-        $batch = Bus::batch($jobs)
-            ->onConnection((string) config('queue.default', 'redis'))
-            ->onQueue((string) config('queue.connections.redis.queue', 'default'))
-            ->name(sprintf('technical-memory:tender-%d:run-%s', $tender->id, $runId))
-            ->allowFailures()
-            ->finally(function (Batch $_batch) use ($memoryId, $runId): void {
-                $memory = TechnicalMemory::query()->find($memoryId);
-
-                if (! $memory) {
-                    return;
-                }
-
-                resolve(UpsertMetricRunSummaryAction::class)(
-                    memory: $memory,
-                    runId: $runId,
-                );
-
-                $hasBlockingSections = $memory->sections()
-                    ->whereIn('status', TechnicalMemorySectionStatus::blockingValues())
-                    ->exists();
-
-                if (! $hasBlockingSections && $memory->status === 'draft') {
-                    $memory->update([
-                        'status' => 'generated',
-                        'generated_at' => now(),
-                    ]);
-                }
-            })
-            ->dispatch();
-
-        $runSummary->update([
-            'batch_id' => $batch->id,
-        ]);
+        unset($runSummary);
     }
 
     /**

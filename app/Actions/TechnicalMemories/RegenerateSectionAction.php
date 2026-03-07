@@ -81,7 +81,12 @@ final class RegenerateSectionAction
             sectionsTotal: 1,
         );
 
-        dispatch(new \App\Jobs\GenerateTechnicalMemorySection(technicalMemorySectionId: $section->id, section: $sectionData, context: $context, runId: (string) $context->runId));
+        resolve(QueueGenerateTechnicalMemorySectionAction::class)(
+            technicalMemorySectionId: $section->id,
+            section: $sectionData,
+            context: $context,
+            runId: (string) $context->runId,
+        );
     }
 
     /**

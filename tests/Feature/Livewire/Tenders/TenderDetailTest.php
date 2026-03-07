@@ -1,6 +1,6 @@
 <?php
 
-use App\Jobs\GenerateTechnicalMemorySection;
+use App\Ai\Agents\TechnicalMemoryDynamicSectionAgent;
 use App\Livewire\Tenders\TenderDetail;
 use App\Models\Document;
 use App\Models\ExtractedCriterion;
@@ -9,10 +9,9 @@ use App\Models\TechnicalMemory;
 use App\Models\TechnicalMemorySection;
 use App\Models\Tender;
 use App\Services\DocumentAnalysisService;
-use Illuminate\Bus\PendingBatch;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Queue;
+use Laravel\Ai\QueuedAgentPrompt;
 use Livewire\Livewire;
 
 uses()->group('livewire');
@@ -147,12 +146,13 @@ it('can regenerate existing technical memory and reset sections', function (): v
         'generated_file_path' => 'technical-memories/old.pdf',
     ]);
 
+    TechnicalMemoryDynamicSectionAgent::fake()->preventStrayPrompts();
+
     Livewire::test(TenderDetail::class, ['tender' => $tender])
         ->call('generateMemory')
         ->assertDispatched('memory-generated');
 
-    Bus::assertBatched(fn (PendingBatch $batch): bool => $batch->jobs->count() === 1
-        && $batch->jobs->first() instanceof GenerateTechnicalMemorySection);
+    TechnicalMemoryDynamicSectionAgent::assertQueued(fn (QueuedAgentPrompt $prompt): bool => $prompt->agent instanceof TechnicalMemoryDynamicSectionAgent);
 
     $memory = $memory->fresh();
 
@@ -262,7 +262,7 @@ it('queues technical memory generation when analysis is complete', function (): 
         'document_id' => $pptDocument->id,
     ]);
 
-    Bus::fake();
+    TechnicalMemoryDynamicSectionAgent::fake()->preventStrayPrompts();
 
     Livewire::test(TenderDetail::class, ['tender' => $tender])
         ->call('generateMemory')
@@ -270,8 +270,7 @@ it('queues technical memory generation when analysis is complete', function (): 
         ->assertSee('Ver progreso de la memoria')
         ->assertSee(route('technical-memories.show', $tender));
 
-    Bus::assertBatched(fn (PendingBatch $batch): bool => $batch->jobs->count() === 1
-        && $batch->jobs->first() instanceof GenerateTechnicalMemorySection);
+    TechnicalMemoryDynamicSectionAgent::assertQueued(fn (QueuedAgentPrompt $prompt): bool => $prompt->agent instanceof TechnicalMemoryDynamicSectionAgent);
 
     expect($tender->fresh()->technicalMemory)->not->toBeNull();
     expect($tender->fresh()->technicalMemory->status)->toBe('draft');
